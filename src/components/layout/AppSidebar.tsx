@@ -2,8 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { LucideIcon, ChevronUp, Scissors } from 'lucide-react';
+import { ChevronUp, LogOut } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -27,46 +26,13 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/auth.context';
+import { useNavigation } from '@/hooks/useNavigation';
+import { cn } from '@/lib/utils';
+import { brandConfig } from '@/app/config/navigation';
 
-export interface NavigationItem {
-  name: string;
-  href: string;
-  icon: LucideIcon;
-  disabled?: boolean;
-  badge?: string;
-  children?: NavigationItem[];
-}
-
-export interface NavigationGroup {
-  label: string;
-  items: NavigationItem[];
-}
-
-export interface AppSidebarProps {
-  navigation: NavigationGroup[];
-  logo?: {
-    icon?: LucideIcon;
-    title: string;
-    subtitle?: string;
-  };
-  userActions?: Array<{
-    label: string;
-    icon: LucideIcon;
-    onClick: () => void;
-  }>;
-}
-
-export function AppSidebar({ 
-  navigation, 
-  logo = {
-    icon: Scissors,
-    title: 'Barbershop',
-    subtitle: 'Manager'
-  },
-  userActions = []
-}: AppSidebarProps) {
+export function AppSidebar() {
   const { user, logout } = useAuth();
-  const pathname = usePathname();
+  const { navigation, userActions, isActiveItem, navigateTo, executeUserAction } = useNavigation();
 
   const handleLogout = async () => {
     try {
@@ -95,32 +61,22 @@ export function AppSidebar({
     return roles[role as keyof typeof roles] || role;
   };
 
-  const isActiveItem = (item: NavigationItem): boolean => {
-    if (item.href === pathname) return true;
-    if (item.children) {
-      return item.children.some(child => child.href === pathname);
-    }
-    return pathname.startsWith(item.href) && item.href !== '/';
-  };
-
-  const LogoIcon = logo.icon;
+  const LogoIcon = brandConfig.logo.icon;
 
   return (
     <Sidebar>
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2">
-          {LogoIcon && (
-            <div className="bg-primary rounded-lg p-2">
-              <LogoIcon className="h-6 w-6 text-primary-foreground" />
-            </div>
-          )}
+          <div className="bg-primary rounded-lg p-2">
+            <LogoIcon className="h-6 w-6 text-primary-foreground" />
+          </div>
           <div>
-            <h1 className="text-lg font-bold text-gray-900">
-              {logo.title}
+            <h1 className="text-lg font-bold text-sidebar-foreground">
+              {brandConfig.logo.title}
             </h1>
-            {logo.subtitle && (
-              <p className="text-xs text-gray-500">
-                {logo.subtitle}
+            {brandConfig.logo.subtitle && (
+              <p className="text-xs text-sidebar-foreground/60">
+                {brandConfig.logo.subtitle}
               </p>
             )}
           </div>
@@ -128,8 +84,8 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent>
-        {navigation.map((group, groupIndex) => (
-          <SidebarGroup key={groupIndex}>
+        {navigation.map((group) => (
+          <SidebarGroup key={group.id}>
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
@@ -138,21 +94,44 @@ export function AppSidebar({
                   const isActive = isActiveItem(item);
                   
                   return (
-                    <SidebarMenuItem key={item.name}>
+                    <SidebarMenuItem key={item.id}>
                       <SidebarMenuButton 
-                        asChild 
+                        asChild={!item.disabled}
                         isActive={isActive}
                         disabled={item.disabled}
+                        className={cn(
+                          item.disabled && "opacity-50 cursor-not-allowed"
+                        )}
                       >
-                        <Link href={item.disabled ? '#' : item.href}>
-                          <Icon className="h-4 w-4" />
-                          <span>{item.name}</span>
-                          {item.badge && (
-                            <span className="ml-auto text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
-                              {item.badge}
-                            </span>
-                          )}
-                        </Link>
+                        {item.disabled ? (
+                          <div className="flex items-center gap-2 w-full">
+                            <Icon className="h-4 w-4" />
+                            <span className="flex-1">{item.name}</span>
+                            {item.badge && (
+                              <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded">
+                                {item.badge}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <Link 
+                            href={item.href}
+                            onClick={(e) => {
+                              if (item.external) {
+                                e.preventDefault();
+                                navigateTo(item.href, true);
+                              }
+                            }}
+                          >
+                            <Icon className="h-4 w-4" />
+                            <span>{item.name}</span>
+                            {item.badge && (
+                              <span className="ml-auto text-xs bg-muted text-muted-foreground px-2 py-1 rounded">
+                                {item.badge}
+                              </span>
+                            )}
+                          </Link>
+                        )}
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
@@ -211,21 +190,34 @@ export function AppSidebar({
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 
-                {/* Ações customizadas */}
-                {userActions.map((action, index) => {
+                {/* Ações do usuário */}
+                {userActions.map((action) => {
+                  if (action.separator) {
+                    return <DropdownMenuSeparator key={action.id} />;
+                  }
+
                   const ActionIcon = action.icon;
                   return (
-                    <DropdownMenuItem key={index} onClick={action.onClick}>
+                    <DropdownMenuItem 
+                      key={action.id} 
+                      onClick={() => {
+                        if (action.onClick) {
+                          action.onClick();
+                        } else if (action.href) {
+                          navigateTo(action.href);
+                        }
+                      }}
+                    >
                       <ActionIcon className="mr-2 h-4 w-4" />
                       {action.label}
                     </DropdownMenuItem>
                   );
                 })}
                 
-                {userActions.length > 0 && <DropdownMenuSeparator />}
+                <DropdownMenuSeparator />
                 
-                <DropdownMenuItem onClick={handleLogout}>
-                  <span className="mr-2">🚪</span>
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
                   Sair
                 </DropdownMenuItem>
               </DropdownMenuContent>

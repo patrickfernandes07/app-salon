@@ -73,7 +73,6 @@ export default function AppointmentModal({
   const [error, setError] = useState('');
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
   const [professionalServices, setProfessionalServices] = useState<Service[]>([]);
   const [totalAmount, setTotalAmount] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
@@ -143,24 +142,22 @@ export default function AppointmentModal({
     }
   }, [appointment, selectedDate, selectedTime, selectedProfessional, setValue]);
 
-  const loadInitialData = async () => {
+  const loadInitialData = async (): Promise<void> => {
     try {
-      const [professionalsData, customersData, servicesData] = await Promise.all([
+      const [professionalsData, customersData] = await Promise.all([
         appointmentService.getProfessionals(user?.companyId),
-        appointmentService.getCustomers(user?.companyId),
-        appointmentService.getServices(user?.companyId)
+        appointmentService.getCustomers(user?.companyId)
       ]);
 
       setProfessionals(professionalsData);
       setCustomers(customersData);
-      setServices(servicesData);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       setError('Erro ao carregar dados iniciais');
     }
   };
 
-  const loadProfessionalServices = async (professionalId: number) => {
+  const loadProfessionalServices = async (professionalId: number): Promise<void> => {
     try {
       const data = await appointmentService.getProfessionalServices(professionalId);
       setProfessionalServices(data);
@@ -169,7 +166,7 @@ export default function AppointmentModal({
     }
   };
 
-  const calculateTotals = () => {
+  const calculateTotals = (): void => {
     let amount = 0;
     let duration = 0;
 
@@ -188,7 +185,7 @@ export default function AppointmentModal({
     setTotalDuration(duration);
   };
 
-  const generateTimeSlots = () => {
+  const generateTimeSlots = (): string[] => {
     const slots = [];
     for (let hour = 8; hour <= 20; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
@@ -217,7 +214,7 @@ export default function AppointmentModal({
     return selectedDateTime < now;
   };
 
-  const onSubmit = async (data: AppointmentFormData) => {
+  const onSubmit = async (data: AppointmentFormData): Promise<void> => {
     try {
       setLoading(true);
       setError('');
@@ -286,7 +283,7 @@ export default function AppointmentModal({
     }
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     reset();
     setError('');
     setProfessionalServices([]);
@@ -295,11 +292,11 @@ export default function AppointmentModal({
     onClose();
   };
 
-  const addService = () => {
+  const addService = (): void => {
     append({ serviceId: 0, quantity: 1 });
   };
 
-  const removeService = (index: number) => {
+  const removeService = (index: number): void => {
     if (fields.length > 1) {
       remove(index);
     }

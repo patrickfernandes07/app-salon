@@ -7,42 +7,35 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
-import { ptBR } from 'date-fns/locale';
-import { format, startOfMonth, endOfMonth, addDays } from 'date-fns';
+import { 
+  DateSelectArg, 
+  EventClickArg, 
+  EventContentArg,
+  DatesSetArg 
+} from '@fullcalendar/core';
+import { startOfMonth, endOfMonth, addDays } from 'date-fns';
 import { 
   Calendar, 
-  Clock, 
-  User, 
   Plus, 
-  Filter, 
   RefreshCw, 
-  Eye,
-  Edit,
-  CheckCircle,
-  XCircle,
-  Play,
-  Square
 } from 'lucide-react';
-
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-
 import { useAuth } from '@/contexts/auth.context';
 import appointmentService, { Appointment, Professional } from '@/services/appointment.service';
 import { safeToFixed } from '@/lib/utils/type-guards';
 import AppointmentModal from '../appointments/AppointmentModal';
 import AppointmentDetailsModal from '../appointments/AppointmentDetailsModal';
+
+// Interfaces auxiliares para tipagem
+interface ServiceInfo {
+  service: {
+    name: string;
+  };
+}
 
 interface CalendarEvent {
   id: string;
@@ -61,6 +54,26 @@ interface CalendarEvent {
   };
 }
 
+type StatusType = 'SCHEDULED' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
+
+interface StatusColors {
+  bg: string;
+  border: string;
+  text: string;
+}
+
+interface AppointmentParams {
+  startDate: string;
+  endDate: string;
+  companyId?: number;
+  professionalId?: number;
+}
+
+interface ValidationResult {
+  valid: boolean;
+  message?: string;
+}
+
 export default function AppointmentCalendar() {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -68,7 +81,7 @@ export default function AppointmentCalendar() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedProfessional, setSelectedProfessional] = useState<number | 'all'>('all');
-  const [calendarView, setCalendarView] = useState('timeGridWeek');
+  const [calendarView] = useState('timeGridWeek');
   const [currentDate, setCurrentDate] = useState(new Date());
 
   // Modals
@@ -87,7 +100,7 @@ export default function AppointmentCalendar() {
     loadAppointments();
   }, [selectedProfessional, currentDate]);
 
-  const loadProfessionals = async () => {
+  const loadProfessionals = async (): Promise<void> => {
     try {
       const data = await appointmentService.getProfessionals(user?.companyId);
       setProfessionals(data);
@@ -96,7 +109,7 @@ export default function AppointmentCalendar() {
     }
   };
 
-  const loadAppointments = async () => {
+  const loadAppointments = async (): Promise<void> => {
     try {
       setLoading(true);
       setError('');
@@ -104,7 +117,7 @@ export default function AppointmentCalendar() {
       const startDate = startOfMonth(addDays(currentDate, -30));
       const endDate = endOfMonth(addDays(currentDate, 30));
 
-      const params = {
+      const params: AppointmentParams = {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         companyId: user?.companyId,
@@ -113,7 +126,7 @@ export default function AppointmentCalendar() {
 
       const data = await appointmentService.getAppointments(params);
       setAppointments(data);
-    } catch (error: any) {
+    } catch (error) {
       setError('Erro ao carregar agendamentos');
       console.error('Erro ao carregar agendamentos:', error);
     } finally {
@@ -121,8 +134,8 @@ export default function AppointmentCalendar() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    const colors = {
+  const getStatusColor = (status: string): StatusColors => {
+    const colors: Record<StatusType, StatusColors> = {
       SCHEDULED: { bg: '#3B82F6', border: '#2563EB', text: '#FFFFFF' },
       CONFIRMED: { bg: '#10B981', border: '#059669', text: '#FFFFFF' },
       IN_PROGRESS: { bg: '#F59E0B', border: '#D97706', text: '#FFFFFF' },
@@ -130,19 +143,7 @@ export default function AppointmentCalendar() {
       CANCELLED: { bg: '#EF4444', border: '#DC2626', text: '#FFFFFF' },
       NO_SHOW: { bg: '#6B7280', border: '#4B5563', text: '#FFFFFF' },
     };
-    return colors[status as keyof typeof colors] || colors.SCHEDULED;
-  };
-
-  const getStatusLabel = (status: string) => {
-    const labels = {
-      SCHEDULED: 'Agendado',
-      CONFIRMED: 'Confirmado',
-      IN_PROGRESS: 'Em Andamento',
-      COMPLETED: 'Concluído',
-      CANCELLED: 'Cancelado',
-      NO_SHOW: 'Não Compareceu',
-    };
-    return labels[status as keyof typeof labels] || status;
+    return colors[status as StatusType] || colors.SCHEDULED;
   };
 
   const convertAppointmentsToEvents = useCallback((appointments: Appointment[]): CalendarEvent[] => {
@@ -174,7 +175,7 @@ export default function AppointmentCalendar() {
   }, []);
 
   // Função para validar se o horário selecionado é válido
-  const validateSelectedTime = (date: Date, time: string): { valid: boolean; message?: string } => {
+  const validateSelectedTime = (date: Date, time: string): ValidationResult => {
     const selectedDateTime = new Date(date);
     const [hours, minutes] = time.split(':').map(Number);
     selectedDateTime.setHours(hours, minutes, 0, 0);
@@ -197,7 +198,7 @@ export default function AppointmentCalendar() {
     return { valid: true };
   };
 
-  const handleDateSelect = (selectInfo: any) => {
+  const handleDateSelect = (selectInfo: DateSelectArg): void => {
     const selectedDate = selectInfo.start;
     
     // Usar o horário local diretamente sem conversões
@@ -224,26 +225,26 @@ export default function AppointmentCalendar() {
     setAppointmentModalOpen(true);
   };
 
-  const handleEventClick = (clickInfo: any) => {
-    const appointment = clickInfo.event.extendedProps.appointment;
+  const handleEventClick = (clickInfo: EventClickArg): void => {
+    const appointment = clickInfo.event.extendedProps.appointment as Appointment;
     setSelectedAppointment(appointment);
     setDetailsModalOpen(true);
   };
 
-  const handleCreateAppointment = () => {
+  const handleCreateAppointment = (): void => {
     setSelectedDate(null);
     setSelectedTime(null);
     setSelectedAppointment(null);
     setAppointmentModalOpen(true);
   };
 
-  const handleEditAppointment = (appointment: Appointment) => {
+  const handleEditAppointment = (appointment: Appointment): void => {
     setSelectedAppointment(appointment);
     setDetailsModalOpen(false);
     setAppointmentModalOpen(true);
   };
 
-  const handleStatusChange = async (appointmentId: number, action: string) => {
+  const handleStatusChange = async (appointmentId: number, action: string): Promise<void> => {
     try {
       setLoading(true);
       
@@ -274,7 +275,7 @@ export default function AppointmentCalendar() {
     }
   };
 
-  const handleDeleteAppointment = async (appointmentId: number) => {
+  const handleDeleteAppointment = async (appointmentId: number): Promise<void> => {
     if (confirm('Tem certeza que deseja excluir este agendamento?')) {
       try {
         setLoading(true);
@@ -289,23 +290,70 @@ export default function AppointmentCalendar() {
     }
   };
 
-  // Função para estilizar slots
-  const getSlotClassName = (slotInfo: any) => {
-    const slotDate = slotInfo.date;
-    const now = new Date();
-    
-    // Destacar horários passados
-    if (slotDate < now) {
-      return 'past-slot';
+  const handleDateClick = (dateClickInfo: { date: Date; view: { type: string } }): void => {
+    if (dateClickInfo.view.type !== 'dayGridMonth') {
+      const selectedDate = dateClickInfo.date;
+      
+      // Usar o horário local diretamente
+      const timeString = selectedDate.toLocaleTimeString('pt-BR', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      });
+      
+      console.log('DateClick - Data:', selectedDate);
+      console.log('DateClick - Horário:', timeString);
+      
+      const validation = validateSelectedTime(selectedDate, timeString);
+      
+      if (!validation.valid) {
+        alert(validation.message);
+        return;
+      }
+      
+      setSelectedDate(selectedDate);
+      setSelectedTime(timeString);
+      setSelectedAppointment(null);
+      setAppointmentModalOpen(true);
     }
+  };
+
+  const handleDatesSet = (dateInfo: DatesSetArg): void => {
+    setCurrentDate(dateInfo.start);
+  };
+
+  const renderEventContent = (eventInfo: EventContentArg) => {
+    const { appointment } = eventInfo.event.extendedProps;
     
-    // Destacar horário de trabalho
-    const hour = slotDate.getHours();
-    if (hour >= 8 && hour < 20) {
-      return 'business-hour-slot';
-    }
+    // Verificar se os dados existem antes de usar
+    const customerName = appointment?.customer?.name || 'Cliente não informado';
     
-    return '';
+    // Tipagem explícita para os serviços
+    const services = (appointment?.services as ServiceInfo[] || [])
+      .map(s => s?.service?.name || 'Serviço')
+      .join(', ') || 'Serviços não informados';
+    
+    const professionalName = appointment?.professional?.name || 'Profissional';
+    const totalAmount = appointment?.totalAmount || 0;
+    
+    return (
+      <div className="p-1 text-xs">
+        <div className="font-semibold truncate">
+          {customerName}
+        </div>
+        <div className="truncate opacity-90">
+          {services}
+        </div>
+        <div className="flex items-center justify-between mt-1">
+          <span className="opacity-75">
+            {professionalName}
+          </span>
+          <span className="font-medium">
+            R$ {safeToFixed(totalAmount)}
+          </span>
+        </div>
+      </div>
+    );
   };
 
   const calendarEvents = convertAppointmentsToEvents(appointments);
@@ -386,14 +434,14 @@ export default function AppointmentCalendar() {
 
             {/* Legenda de status */}
             <div className="flex flex-wrap gap-2 mb-4">
-              {Object.entries({
+              {(Object.entries({
                 SCHEDULED: 'Agendado',
                 CONFIRMED: 'Confirmado',
                 IN_PROGRESS: 'Em Andamento',
                 COMPLETED: 'Concluído',
                 CANCELLED: 'Cancelado',
                 NO_SHOW: 'Não Compareceu',
-              }).map(([status, label]) => {
+              }) as [StatusType, string][]).map(([status, label]) => {
                 const colors = getStatusColor(status);
                 return (
                   <Badge
@@ -445,33 +493,7 @@ export default function AppointmentCalendar() {
                 selectOverlap={false}
                 
                 // Callback para cliques simples em slots vazios
-                dateClick={(dateClickInfo) => {
-                  if (dateClickInfo.view.type !== 'dayGridMonth') {
-                    const selectedDate = dateClickInfo.date;
-                    
-                    // Usar o horário local diretamente
-                    const timeString = selectedDate.toLocaleTimeString('pt-BR', { 
-                      hour: '2-digit', 
-                      minute: '2-digit',
-                      hour12: false 
-                    });
-                    
-                    console.log('DateClick - Data:', selectedDate);
-                    console.log('DateClick - Horário:', timeString);
-                    
-                    const validation = validateSelectedTime(selectedDate, timeString);
-                    
-                    if (!validation.valid) {
-                      alert(validation.message);
-                      return;
-                    }
-                    
-                    setSelectedDate(selectedDate);
-                    setSelectedTime(timeString);
-                    setSelectedAppointment(null);
-                    setAppointmentModalOpen(true);
-                  }
-                }}
+                dateClick={handleDateClick}
                 
                 locale="pt-br"
                 timeZone="local"
@@ -508,37 +530,8 @@ export default function AppointmentCalendar() {
                     dayHeaderFormat: { weekday: 'long', day: 'numeric', month: 'long' }
                   }
                 }}
-                eventContent={(eventInfo) => {
-                  const { appointment } = eventInfo.event.extendedProps;
-                  
-                  // Verificar se os dados existem antes de usar
-                  const customerName = appointment?.customer?.name || 'Cliente não informado';
-                  const services = appointment?.services?.map(s => s?.service?.name || 'Serviço').join(', ') || 'Serviços não informados';
-                  const professionalName = appointment?.professional?.name || 'Profissional';
-                  const totalAmount = appointment?.totalAmount || 0;
-                  
-                  return (
-                    <div className="p-1 text-xs">
-                      <div className="font-semibold truncate">
-                        {customerName}
-                      </div>
-                      <div className="truncate opacity-90">
-                        {services}
-                      </div>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="opacity-75">
-                          {professionalName}
-                        </span>
-                        <span className="font-medium">
-                          R$ {safeToFixed(totalAmount)}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }}
-                datesSet={(dateInfo) => {
-                  setCurrentDate(dateInfo.start);
-                }}
+                eventContent={renderEventContent}
+                datesSet={handleDatesSet}
               />
             </div>
           </CardContent>

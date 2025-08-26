@@ -4,7 +4,6 @@ import {
   Customer,
   CreateCustomerData,
   UpdateCustomerData,
-  CustomerFilters,
 } from "@/types/customer";
 
 class CustomerService {

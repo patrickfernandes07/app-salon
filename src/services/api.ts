@@ -1,10 +1,28 @@
 // src/services/api.ts
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
+import axios, {
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosResponse,
+  InternalAxiosRequestConfig,
+} from "axios";
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   data: T;
   message?: string;
   success?: boolean;
+}
+
+export interface RefreshTokenResponse {
+  accessToken: string;
+  refreshToken?: string;
+}
+
+export interface RefreshTokenRequest {
+  refreshToken: string;
+}
+
+interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
 }
 
 class ApiService {
@@ -15,7 +33,7 @@ class ApiService {
   constructor() {
     this.api = axios.create({
       baseURL: this.baseURL,
-      timeout: 10000,
+      timeout: 100000,
       headers: {
         "Content-Type": "application/json",
       },
@@ -24,17 +42,17 @@ class ApiService {
     this.setupInterceptors();
   }
 
-  private setupInterceptors() {
+  private setupInterceptors(): void {
     // Request interceptor - adiciona token automaticamente
     this.api.interceptors.request.use(
       (config) => {
         const token = this.getAccessToken();
-        if (token) {
+        if (token && config.headers) {
           config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
       },
-      (error) => {
+      (error: unknown) => {
         return Promise.reject(error);
       }
     );
@@ -42,10 +60,18 @@ class ApiService {
     // Response interceptor - lida com refresh token
     this.api.interceptors.response.use(
       (response) => response,
-      async (error) => {
-        const originalRequest = error.config;
+      async (error: unknown) => {
+        if (!this.isAxiosError(error)) {
+          return Promise.reject(error);
+        }
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        const originalRequest = error.config as ExtendedAxiosRequestConfig;
+
+        if (
+          error.response?.status === 401 &&
+          originalRequest &&
+          !originalRequest._retry
+        ) {
           originalRequest._retry = true;
 
           try {
@@ -61,7 +87,9 @@ class ApiService {
             this.setAccessToken(accessToken);
 
             // Retry original request with new token
-            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+            if (originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+            }
             return this.api(originalRequest);
           } catch (refreshError) {
             this.clearTokens();
@@ -75,8 +103,13 @@ class ApiService {
     );
   }
 
+  // Type guard para verificar se é um AxiosError
+  private isAxiosError(error: unknown): error is import("axios").AxiosError {
+    return axios.isAxiosError(error);
+  }
+
   // Métodos públicos para requisições
-  public async get<T>(
+  public async get<T = unknown>(
     url: string,
     config?: AxiosRequestConfig
   ): Promise<ApiResponse<T>> {
@@ -84,34 +117,34 @@ class ApiService {
     return this.handleResponse(response);
   }
 
-  public async post<T>(
+  public async post<T = unknown, D = unknown>(
     url: string,
-    data?: any,
+    data?: D,
     config?: AxiosRequestConfig
   ): Promise<ApiResponse<T>> {
     const response = await this.api.post<T>(url, data, config);
     return this.handleResponse(response);
   }
 
-  public async put<T>(
+  public async put<T = unknown, D = unknown>(
     url: string,
-    data?: any,
+    data?: D,
     config?: AxiosRequestConfig
   ): Promise<ApiResponse<T>> {
     const response = await this.api.put<T>(url, data, config);
     return this.handleResponse(response);
   }
 
-  public async patch<T>(
+  public async patch<T = unknown, D = unknown>(
     url: string,
-    data?: any,
+    data?: D,
     config?: AxiosRequestConfig
   ): Promise<ApiResponse<T>> {
     const response = await this.api.patch<T>(url, data, config);
     return this.handleResponse(response);
   }
 
-  public async delete<T>(
+  public async delete<T = unknown>(
     url: string,
     config?: AxiosRequestConfig
   ): Promise<ApiResponse<T>> {
@@ -120,9 +153,12 @@ class ApiService {
   }
 
   // Métodos de autenticação
-  private async refreshAccessToken() {
+  private async refreshAccessToken(): Promise<
+    AxiosResponse<RefreshTokenResponse>
+  > {
     const refreshToken = this.getRefreshToken();
-    return this.api.post("/auth/refresh", { refreshToken });
+    const requestData: RefreshTokenRequest = { refreshToken: refreshToken! };
+    return this.api.post<RefreshTokenResponse>("/auth/refresh", requestData);
   }
 
   private handleResponse<T>(response: AxiosResponse<T>): ApiResponse<T> {

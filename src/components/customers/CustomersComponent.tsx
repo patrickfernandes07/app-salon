@@ -38,7 +38,7 @@ export function CustomersComponent() {
       await createCustomer(data)
       setIsCreateDialogOpen(false)
     } catch (error) {
-      // Error handling is done in the hook
+      console.error(error);
     }
   }
 
@@ -53,7 +53,7 @@ export function CustomersComponent() {
       await updateCustomer(editingCustomer.id, data)
       setEditingCustomer(null)
     } catch (error) {
-      // Error handling is done in the hook
+      console.error(error);
     }
   }
 
@@ -68,7 +68,7 @@ export function CustomersComponent() {
       await deleteCustomer(customerToDelete.id)
       setCustomerToDelete(null)
     } catch (error) {
-      // Error handling is done in the hook
+      console.error(error);
     }
   }
 
@@ -76,7 +76,7 @@ export function CustomersComponent() {
     try {
       await toggleCustomerStatus(customer)
     } catch (error) {
-      // Error handling is done in the hook
+      console.error(error);
     }
   }
 

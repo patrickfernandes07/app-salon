@@ -32,7 +32,7 @@ import { brandConfig } from '@/app/config/navigation';
 
 export function AppSidebar() {
   const { user, logout } = useAuth();
-  const { navigation, userActions, isActiveItem, navigateTo, executeUserAction } = useNavigation();
+  const { navigation, userActions, isActiveItem, navigateTo } = useNavigation();
 
   const handleLogout = async () => {
     try {

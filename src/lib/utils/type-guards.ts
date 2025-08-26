@@ -7,17 +7,20 @@ interface PrismaDecimal {
   d: number[];
 }
 
-export const isNumber = (value: any): value is number => {
+// Tipo para valores que podem ser convertidos em número
+type ConvertibleValue = string | number | PrismaDecimal | null | undefined;
+
+export const isNumber = (value: unknown): value is number => {
   return typeof value === "number" && !isNaN(value);
 };
 
-export const isPrismaDecimal = (value: any): value is PrismaDecimal => {
+export const isPrismaDecimal = (value: unknown): value is PrismaDecimal => {
   return (
     typeof value === "object" &&
     value !== null &&
-    typeof value.s === "number" &&
-    typeof value.e === "number" &&
-    Array.isArray(value.d)
+    typeof (value as Record<string, unknown>).s === "number" &&
+    typeof (value as Record<string, unknown>).e === "number" &&
+    Array.isArray((value as Record<string, unknown>).d)
   );
 };
 
@@ -55,7 +58,10 @@ export const decimalToNumber = (decimal: PrismaDecimal): number => {
   return sign === -1 ? -result : result;
 };
 
-export const safeToFixed = (value: any, decimals: number = 2): string => {
+export const safeToFixed = (
+  value: ConvertibleValue,
+  decimals: number = 2
+): string => {
   if (isNumber(value)) {
     return value.toFixed(decimals);
   }
@@ -75,7 +81,7 @@ export const safeToFixed = (value: any, decimals: number = 2): string => {
   return (0).toFixed(decimals);
 };
 
-export const safeNumber = (value: any): number => {
+export const safeNumber = (value: ConvertibleValue): number => {
   if (isNumber(value)) {
     return value;
   }

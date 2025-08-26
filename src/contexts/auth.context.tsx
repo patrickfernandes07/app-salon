@@ -48,7 +48,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       console.error('Erro ao verificar autenticação:', error);
       // Se houver erro, limpar dados
-      authService.clearTokens();
       authService.clearUser();
       setUser(null);
     } finally {

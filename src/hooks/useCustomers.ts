@@ -7,7 +7,6 @@ import {
   Customer,
   CreateCustomerData,
   UpdateCustomerData,
-  CustomerFilters,
 } from "@/types/customer";
 import { toast } from "@/components/ui/use-toast";
 
@@ -16,10 +15,10 @@ export const useCustomers = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchCustomers = async (filters?: CustomerFilters) => {
+  const fetchCustomers = async () => {
     try {
       setLoading(true);
-      const response = await customerService.getCustomers(filters);
+      const response = await customerService.getCustomers(1); // provisorio
       setCustomers(response.data);
     } catch (error) {
       toast({

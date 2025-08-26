@@ -34,6 +34,25 @@ export interface RefreshTokenResponse {
   refreshToken: string;
 }
 
+// Interface para erros da API
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+  message?: string;
+}
+
+// Type guard para verificar se é um erro da API
+function isApiError(error: unknown): error is ApiError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    ("response" in error || "message" in error)
+  );
+}
+
 class AuthService {
   private readonly USER_KEY = "user";
 
@@ -59,9 +78,14 @@ class AuthService {
       }
 
       throw new Error("Resposta inválida do servidor");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro no login:", error);
-      throw new Error(error.response?.data?.message || "Erro ao fazer login");
+
+      if (isApiError(error)) {
+        throw new Error(error.response?.data?.message || "Erro ao fazer login");
+      }
+
+      throw new Error("Erro ao fazer login");
     }
   }
 
@@ -76,7 +100,7 @@ class AuthService {
       if (typeof window !== "undefined") {
         window.location.href = "/login";
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Erro no logout:", error);
       // Mesmo com erro, limpar dados locais
       apiService.clearTokens();
@@ -110,11 +134,16 @@ class AuthService {
       }
 
       throw new Error("Resposta inválida do servidor");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao renovar token:", error);
-      throw new Error(
-        error.response?.data?.message || "Erro ao renovar sessão"
-      );
+
+      if (isApiError(error)) {
+        throw new Error(
+          error.response?.data?.message || "Erro ao renovar sessão"
+        );
+      }
+
+      throw new Error("Erro ao renovar sessão");
     }
   }
 
@@ -129,11 +158,16 @@ class AuthService {
       }
 
       throw new Error("Usuário não encontrado");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao obter usuário atual:", error);
-      throw new Error(
-        error.response?.data?.message || "Erro ao obter dados do usuário"
-      );
+
+      if (isApiError(error)) {
+        throw new Error(
+          error.response?.data?.message || "Erro ao obter dados do usuário"
+        );
+      }
+
+      throw new Error("Erro ao obter dados do usuário");
     }
   }
 
@@ -148,8 +182,8 @@ class AuthService {
       const userStr = sessionStorage.getItem(this.USER_KEY);
       if (userStr) {
         try {
-          return JSON.parse(userStr);
-        } catch (error) {
+          return JSON.parse(userStr) as User;
+        } catch (error: unknown) {
           console.error("Erro ao parsear dados do usuário:", error);
           this.clearUser();
         }

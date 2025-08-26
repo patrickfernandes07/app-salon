@@ -91,25 +91,18 @@ export default function AppointmentCalendar() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadProfessionals();
-    loadAppointments();
-  }, []);
-
-  useEffect(() => {
-    loadAppointments();
-  }, [selectedProfessional, currentDate]);
-
-  const loadProfessionals = async (): Promise<void> => {
+  // Transformar loadProfessionals em useCallback
+  const loadProfessionals = useCallback(async (): Promise<void> => {
     try {
       const data = await appointmentService.getProfessionals(user?.companyId);
       setProfessionals(data);
     } catch (error) {
       console.error('Erro ao carregar profissionais:', error);
     }
-  };
+  }, [user?.companyId]);
 
-  const loadAppointments = async (): Promise<void> => {
+  // Transformar loadAppointments em useCallback
+  const loadAppointments = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
       setError('');
@@ -132,7 +125,16 @@ export default function AppointmentCalendar() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.companyId, currentDate, selectedProfessional]);
+
+  useEffect(() => {
+    loadProfessionals();
+    loadAppointments();
+  }, [loadProfessionals, loadAppointments]);
+
+  useEffect(() => {
+    loadAppointments();
+  }, [loadAppointments]);
 
   const getStatusColor = (status: string): StatusColors => {
     const colors: Record<StatusType, StatusColors> = {

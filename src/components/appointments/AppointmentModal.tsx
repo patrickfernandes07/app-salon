@@ -1,7 +1,7 @@
 // src/components/appointments/AppointmentModal.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -102,12 +102,48 @@ export default function AppointmentModal({
   const watchedServices = watch('services');
   const watchedDiscount = watch('discount') || 0;
 
+  // Mover loadInitialData para useCallback para evitar warning
+  const loadInitialData = useCallback(async (): Promise<void> => {
+    try {
+      const [professionalsData, customersData] = await Promise.all([
+        appointmentService.getProfessionals(user?.companyId),
+        appointmentService.getCustomers(user?.companyId)
+      ]);
+
+      setProfessionals(professionalsData);
+      setCustomers(customersData);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      setError('Erro ao carregar dados iniciais');
+    }
+  }, [user?.companyId]);
+
+  // Mover calculateTotals para useCallback para evitar warning
+  const calculateTotals = useCallback((): void => {
+    let amount = 0;
+    let duration = 0;
+
+    watchedServices.forEach(item => {
+      const service = professionalServices.find(s => s.id === item.serviceId);
+      if (service && item.quantity > 0) {
+        amount += safeNumber(service.price) * item.quantity;
+        duration += (service.duration || 30) * item.quantity;
+      }
+    });
+
+    const discountAmount = amount * (watchedDiscount / 100);
+    const finalAmount = Math.max(0, amount - discountAmount);
+    
+    setTotalAmount(finalAmount);
+    setTotalDuration(duration);
+  }, [watchedServices, watchedDiscount, professionalServices]);
+
   // Carregar dados iniciais
   useEffect(() => {
     if (open) {
       loadInitialData();
     }
-  }, [open]);
+  }, [open, loadInitialData]);
 
   // Carregar serviços do profissional quando selecionado
   useEffect(() => {
@@ -119,7 +155,7 @@ export default function AppointmentModal({
   // Calcular total e duração
   useEffect(() => {
     calculateTotals();
-  }, [watchedServices, watchedDiscount, professionalServices]);
+  }, [calculateTotals]);
 
   // Preencher dados para edição ou valores selecionados
   useEffect(() => {
@@ -142,21 +178,6 @@ export default function AppointmentModal({
     }
   }, [appointment, selectedDate, selectedTime, selectedProfessional, setValue]);
 
-  const loadInitialData = async (): Promise<void> => {
-    try {
-      const [professionalsData, customersData] = await Promise.all([
-        appointmentService.getProfessionals(user?.companyId),
-        appointmentService.getCustomers(user?.companyId)
-      ]);
-
-      setProfessionals(professionalsData);
-      setCustomers(customersData);
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      setError('Erro ao carregar dados iniciais');
-    }
-  };
-
   const loadProfessionalServices = async (professionalId: number): Promise<void> => {
     try {
       const data = await appointmentService.getProfessionalServices(professionalId);
@@ -164,25 +185,6 @@ export default function AppointmentModal({
     } catch (error) {
       console.error('Erro ao carregar serviços do profissional:', error);
     }
-  };
-
-  const calculateTotals = (): void => {
-    let amount = 0;
-    let duration = 0;
-
-    watchedServices.forEach(item => {
-      const service = professionalServices.find(s => s.id === item.serviceId);
-      if (service && item.quantity > 0) {
-        amount += safeNumber(service.price) * item.quantity;
-        duration += (service.duration || 30) * item.quantity;
-      }
-    });
-
-    const discountAmount = amount * (watchedDiscount / 100);
-    const finalAmount = Math.max(0, amount - discountAmount);
-    
-    setTotalAmount(finalAmount);
-    setTotalDuration(duration);
   };
 
   const generateTimeSlots = (): string[] => {
@@ -272,7 +274,7 @@ export default function AppointmentModal({
 
       onSuccess();
       handleClose();
-    } catch (error) {
+    } catch (error: unknown) {
       // Tipagem mais específica para o erro
       const errorMessage = error instanceof Error 
         ? error.message 

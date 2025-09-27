@@ -64,18 +64,14 @@ export const navigation: NavigationGroup[] = [
       {
         id: "services",
         name: "Serviços",
-        href: "/dashboard/services",
+        href: "/services",
         icon: Scissors,
-        disabled: true,
-        badge: "Em breve",
       },
       {
         id: "products",
         name: "Produtos",
-        href: "/dashboard/products",
+        href: "/products",
         icon: Package,
-        disabled: true,
-        badge: "Em breve",
       },
     ],
   },
@@ -86,7 +82,7 @@ export const navigation: NavigationGroup[] = [
       {
         id: "transactions",
         name: "Transações",
-        href: "/dashboard/transactions",
+        href: "/transactions",
         icon: DollarSign,
         disabled: true,
         badge: "Em breve",
@@ -94,7 +90,7 @@ export const navigation: NavigationGroup[] = [
       {
         id: "reports",
         name: "Relatórios",
-        href: "/dashboard/reports",
+        href: "/reports",
         icon: BarChart3,
         disabled: true,
         badge: "Em breve",
@@ -108,7 +104,7 @@ export const navigation: NavigationGroup[] = [
       {
         id: "settings",
         name: "Configurações",
-        href: "/dashboard/settings",
+        href: "/settings",
         icon: Settings,
         disabled: true,
         badge: "Em breve",
@@ -116,7 +112,7 @@ export const navigation: NavigationGroup[] = [
       {
         id: "users",
         name: "Usuários",
-        href: "/dashboard/users",
+        href: "/users",
         icon: Shield,
         disabled: true,
         badge: "Em breve",
@@ -124,7 +120,7 @@ export const navigation: NavigationGroup[] = [
       {
         id: "logs",
         name: "Logs do Sistema",
-        href: "/dashboard/logs",
+        href: "/logs",
         icon: FileText,
         disabled: true,
         badge: "Em breve",

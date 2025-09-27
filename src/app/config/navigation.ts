@@ -84,8 +84,6 @@ export const navigation: NavigationGroup[] = [
         name: "Transações",
         href: "/transactions",
         icon: DollarSign,
-        disabled: true,
-        badge: "Em breve",
       },
       {
         id: "reports",

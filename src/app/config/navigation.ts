@@ -56,10 +56,8 @@ export const navigation: NavigationGroup[] = [
       {
         id: "professionals",
         name: "Profissionais",
-        href: "/dashboard/professionals",
+        href: "/professionals",
         icon: User,
-        disabled: true,
-        badge: "Em breve",
       },
       {
         id: "services",
@@ -90,8 +88,6 @@ export const navigation: NavigationGroup[] = [
         name: "Relatórios",
         href: "/reports",
         icon: BarChart3,
-        disabled: true,
-        badge: "Em breve",
       },
     ],
   },
@@ -135,28 +131,10 @@ export interface UserAction {
 
 export const userActions: UserAction[] = [
   {
-    id: "profile",
-    label: "Meu Perfil",
-    icon: User,
-    href: "/dashboard/profile",
-  },
-  {
     id: "account-settings",
     label: "Configurações da Conta",
     icon: Settings,
-    href: "/dashboard/account",
-  },
-  {
-    id: "separator-1",
-    label: "",
-    icon: User, // Não usado
-    separator: true,
-  },
-  {
-    id: "working-hours",
-    label: "Meus Horários",
-    icon: Clock,
-    href: "/dashboard/my-schedule",
+    href: "/profile",
   },
 ];
 

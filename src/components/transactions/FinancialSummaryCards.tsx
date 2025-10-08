@@ -48,6 +48,15 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
     )
   }
 
+  // Extrai os valores corretos da estrutura
+  const totalIncome = summary.totalIncome ?? 0
+  const totalExpense = summary.totalExpense ?? 0
+  const balance = summary.balance ?? 0
+  const pendingPayments = summary.pendingPayments ?? 0
+  const overduePayments = summary.overduePayments ?? 0
+  const paidTransactions = summary.paidTransactions ?? 0
+  const totalTransactions = summary.totalTransactions ?? 0
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
       {/* Receitas */}
@@ -58,7 +67,7 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-green-600">
-            {formatCurrency(summary.totalIncome)}
+            {formatCurrency(totalIncome)}
           </div>
           <p className="text-xs text-muted-foreground">
             Total de entradas
@@ -74,7 +83,7 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-red-600">
-            {formatCurrency(summary.totalExpense)}
+            {formatCurrency(totalExpense)}
           </div>
           <p className="text-xs text-muted-foreground">
             Total de saídas
@@ -89,8 +98,8 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
           <DollarSign className="h-4 w-4 text-blue-600" />
         </CardHeader>
         <CardContent>
-          <div className={`text-2xl font-bold ${summary.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {formatCurrency(summary.balance)}
+          <div className={`text-2xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {formatCurrency(balance)}
           </div>
           <p className="text-xs text-muted-foreground">
             Receitas - Despesas
@@ -106,7 +115,7 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-yellow-600">
-            {formatCurrency(summary.pendingPayments)}
+            {formatCurrency(pendingPayments)}
           </div>
           <p className="text-xs text-muted-foreground">
             Aguardando pagamento
@@ -122,7 +131,7 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-red-600">
-            {formatCurrency(summary.overduePayments)}
+            {formatCurrency(overduePayments)}
           </div>
           <p className="text-xs text-muted-foreground">
             Pagamentos em atraso
@@ -138,10 +147,10 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {summary.paidTransactions}
+            {paidTransactions}
           </div>
           <p className="text-xs text-muted-foreground">
-            de {summary.totalTransactions} pagas
+            {totalTransactions > 0 ? `de ${totalTransactions} pagas` : 'Nenhuma transação'}
           </p>
         </CardContent>
       </Card>

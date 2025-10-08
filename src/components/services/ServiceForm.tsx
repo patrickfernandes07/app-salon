@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Service, CreateServiceData, UpdateServiceData, ServiceCategory, ServiceCategoryLabels } from "@/types/service"
+import { useState } from "react"
 
 const serviceSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -46,7 +47,45 @@ interface ServiceFormProps {
   isSubmitting: boolean
 }
 
+// Função para formatar o valor em reais
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value)
+}
+
+// Função para converter string formatada em número
+const parseCurrencyToNumber = (value: string): number => {
+  // Remove R$, espaços, pontos (milhares) e substitui vírgula por ponto
+  const cleanValue = value
+    .replace(/R\$\s?/g, '')
+    .replace(/\./g, '')
+    .replace(',', '.')
+  return parseFloat(cleanValue) || 0
+}
+
+// Função para formatar enquanto digita
+const formatCurrencyInput = (value: string): string => {
+  // Remove tudo que não é número
+  const numbers = value.replace(/\D/g, '')
+  
+  if (!numbers) return ''
+  
+  // Converte para número dividindo por 100 (centavos)
+  const amount = parseFloat(numbers) / 100
+  
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(amount)
+}
+
 export function ServiceForm({ service, onSubmit, onCancel, isSubmitting }: ServiceFormProps) {
+  const [priceDisplay, setPriceDisplay] = useState(
+    service?.price ? formatCurrency(service.price) : ''
+  )
+
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceSchema),
     defaultValues: {
@@ -69,6 +108,16 @@ export function ServiceForm({ service, onSubmit, onCancel, isSubmitting }: Servi
     }
     
     await onSubmit(formattedValues)
+  }
+
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value
+    const formatted = formatCurrencyInput(inputValue)
+    setPriceDisplay(formatted)
+    
+    // Atualiza o valor numérico no form
+    const numericValue = parseCurrencyToNumber(formatted)
+    form.setValue('price', numericValue)
   }
 
   // Duração em horas e minutos para facilitar a entrada
@@ -131,16 +180,14 @@ export function ServiceForm({ service, onSubmit, onCancel, isSubmitting }: Servi
                 <FormLabel>Preço *</FormLabel>
                 <FormControl>
                   <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0,00"
-                    {...field}
-                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    type="text"
+                    placeholder="R$ 0,00"
+                    value={priceDisplay}
+                    onChange={handlePriceChange}
                   />
                 </FormControl>
                 <FormDescription>
-                  Valor em reais (R$)
+                  Digite o valor em reais
                 </FormDescription>
                 <FormMessage />
               </FormItem>

@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Product, CreateProductData, UpdateProductData, ProductCategory, ProductCategoryLabels, ProductUnits } from "@/types/product"
+import { useState } from "react"
 
 const productSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -51,7 +52,45 @@ interface ProductFormProps {
   isSubmitting: boolean
 }
 
+// Função para formatar o valor em reais
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value)
+}
+
+// Função para converter string formatada em número
+const parseCurrencyToNumber = (value: string): number => {
+  const cleanValue = value
+    .replace(/R\$\s?/g, '')
+    .replace(/\./g, '')
+    .replace(',', '.')
+  return parseFloat(cleanValue) || 0
+}
+
+// Função para formatar enquanto digita
+const formatCurrencyInput = (value: string): string => {
+  const numbers = value.replace(/\D/g, '')
+  
+  if (!numbers) return ''
+  
+  const amount = parseFloat(numbers) / 100
+  
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(amount)
+}
+
 export function ProductForm({ product, onSubmit, onCancel, isSubmitting }: ProductFormProps) {
+  const [costPriceDisplay, setCostPriceDisplay] = useState(
+    product?.costPrice ? formatCurrency(product.costPrice) : ''
+  )
+  const [salePriceDisplay, setSalePriceDisplay] = useState(
+    product?.salePrice ? formatCurrency(product.salePrice) : ''
+  )
+
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -81,6 +120,24 @@ export function ProductForm({ product, onSubmit, onCancel, isSubmitting }: Produ
     }
     
     await onSubmit(formattedValues)
+  }
+
+  const handleCostPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value
+    const formatted = formatCurrencyInput(inputValue)
+    setCostPriceDisplay(formatted)
+    
+    const numericValue = parseCurrencyToNumber(formatted)
+    form.setValue('costPrice', numericValue)
+  }
+
+  const handleSalePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value
+    const formatted = formatCurrencyInput(inputValue)
+    setSalePriceDisplay(formatted)
+    
+    const numericValue = parseCurrencyToNumber(formatted)
+    form.setValue('salePrice', numericValue)
   }
 
   const calculateMargin = () => {
@@ -195,16 +252,14 @@ export function ProductForm({ product, onSubmit, onCancel, isSubmitting }: Produ
                 <FormLabel>Preço de Custo *</FormLabel>
                 <FormControl>
                   <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0,00"
-                    {...field}
-                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    type="text"
+                    placeholder="R$ 0,00"
+                    value={costPriceDisplay}
+                    onChange={handleCostPriceChange}
                   />
                 </FormControl>
                 <FormDescription>
-                  Valor em reais (R$)
+                  Digite o valor em reais
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -219,12 +274,10 @@ export function ProductForm({ product, onSubmit, onCancel, isSubmitting }: Produ
                 <FormLabel>Preço de Venda *</FormLabel>
                 <FormControl>
                   <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0,00"
-                    {...field}
-                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    type="text"
+                    placeholder="R$ 0,00"
+                    value={salePriceDisplay}
+                    onChange={handleSalePriceChange}
                   />
                 </FormControl>
                 <FormDescription>

@@ -122,3 +122,19 @@ export interface FinancialSummary {
   paidTransactions: number;
   totalTransactions: number;
 }
+
+export interface FinancialSummary {
+  summary: {
+    totalIncome: number;
+    totalExpense: number;
+    balance: number;
+    pendingTotal: number;
+    overdueTotal: number;
+  };
+  categoryBreakdown: Array<{
+    category: string;
+    type: string;
+    total: number;
+    count: number;
+  }>;
+}

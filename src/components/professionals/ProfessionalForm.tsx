@@ -23,7 +23,10 @@ const professionalSchema = z.object({
   email: z.string().email("Email inválido").optional().or(z.literal("")),
   phone: z.string().optional(),
   specialty: z.string().optional(),
-  commission: z.number().min(0, "Comissão não pode ser negativa").max(100, "Comissão não pode ser maior que 100"),
+  commission: z.number("A comissão é obrigatória")
+  .positive("A comissão deve ser maior que 0")
+  .min(0.01, "A comissão deve ser maior que 0")
+  .max(100, "Comissão não pode ser maior que 100"),
   hireDate: z.string().optional(),
   bio: z.string().optional(),
   instagram: z.string().optional(),
@@ -47,7 +50,7 @@ export function ProfessionalForm({ professional, onSubmit, onCancel, isSubmittin
       email: professional?.email || "",
       phone: professional?.phone || "",
       specialty: professional?.specialty || "",
-      commission: professional?.commission ? Number(professional.commission) : 0,
+      commission: professional?.commission ? Number(professional.commission) : undefined,
       hireDate: professional?.hireDate ? new Date(professional.hireDate).toISOString().split('T')[0] : "",
       bio: professional?.bio || "",
       instagram: professional?.instagram || "",
@@ -138,20 +141,24 @@ export function ProfessionalForm({ professional, onSubmit, onCancel, isSubmittin
             name="commission"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Comissão (%)</FormLabel>
+                <FormLabel>Comissão (%) *</FormLabel>
                 <FormControl>
                   <Input 
                     type="number" 
-                    placeholder="0" 
+                    placeholder="Ex: 50" 
                     step="0.01"
-                    min="0"
+                    min="0.01"
                     max="100"
                     {...field}
-                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => {
+                      const value = e.target.value === "" ? undefined : parseFloat(e.target.value)
+                      field.onChange(value)
+                    }}
+                    value={field.value || ""}
                   />
                 </FormControl>
                 <FormDescription>
-                  Porcentagem de comissão sobre serviços
+                  Porcentagem de comissão sobre serviços (obrigatório)
                 </FormDescription>
                 <FormMessage />
               </FormItem>

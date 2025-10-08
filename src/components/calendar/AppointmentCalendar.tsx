@@ -30,6 +30,7 @@ import { safeToFixed } from '@/lib/utils/type-guards';
 import AppointmentModal from '../appointments/AppointmentModal';
 import AppointmentDetailsModal from '../appointments/AppointmentDetailsModal';
 
+
 // Interfaces auxiliares para tipagem
 interface ServiceInfo {
   service: {
@@ -87,7 +88,9 @@ export default function AppointmentCalendar() {
   // Modals
   const [appointmentModalOpen, setAppointmentModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [appointmentToDelete, setAppointmentToDelete] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
@@ -277,18 +280,25 @@ export default function AppointmentCalendar() {
     }
   };
 
-  const handleDeleteAppointment = async (appointmentId: number): Promise<void> => {
-    if (confirm('Tem certeza que deseja excluir este agendamento?')) {
-      try {
-        setLoading(true);
-        await appointmentService.deleteAppointment(appointmentId);
-        loadAppointments();
-        setDetailsModalOpen(false);
-      } catch (error) {
-        console.error('Erro ao excluir agendamento:', error);
-      } finally {
-        setLoading(false);
-      }
+  const handleDeleteAppointment = (appointmentId: number): void => {
+    setAppointmentToDelete(appointmentId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async (): Promise<void> => {
+    if (!appointmentToDelete) return;
+
+    try {
+      setLoading(true);
+      await appointmentService.deleteAppointment(appointmentToDelete);
+      loadAppointments();
+      setDetailsModalOpen(false);
+      setDeleteDialogOpen(false);
+      setAppointmentToDelete(null);
+    } catch (error) {
+      console.error('Erro ao excluir agendamento:', error);
+    } finally {
+      setLoading(false);
     }
   };
 

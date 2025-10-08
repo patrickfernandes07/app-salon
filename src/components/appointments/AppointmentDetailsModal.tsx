@@ -1,6 +1,7 @@
 // src/components/appointments/AppointmentDetailsModal.tsx
 'use client';
 
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -38,6 +39,7 @@ import {
 import { Appointment } from '@/services/appointment.service';
 import { useAuth } from '@/contexts/auth.context';
 import { safeToFixed, safeNumber } from '@/lib/utils/type-guards';
+import DeleteAppointmentDialog from './DeleteAppointmentDialog';
 
 interface AppointmentDetailsModalProps {
   open: boolean;
@@ -59,6 +61,7 @@ export default function AppointmentDetailsModal({
   loading
 }: AppointmentDetailsModalProps) {
   const { user } = useAuth();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   if (!appointment) return null;
 
@@ -138,8 +141,26 @@ export default function AppointmentDetailsModal({
       .slice(0, 2);
   };
 
+  const handleDeleteClick = () => {
+    setDeleteDialogOpen(true);
+  };
+
+const handleConfirmDelete = async () => {
+  try {
+    console.log('📋 Modal: Confirmando exclusão do agendamento', appointment.id);
+    await onDelete(appointment.id);
+    setDeleteDialogOpen(false);
+  } catch (error) {
+    console.error('📋 Modal: Erro ao tentar excluir:', error);
+    // Mantém o dialog aberto em caso de erro
+  }
+};
   const totalDuration = appointment.services.reduce(
-    (total, service) => total + (service.service.duration * service.quantity), 
+    (total, service) => {
+      const duration = service.service?.duration || 30; // fallback para 30 minutos
+      const quantity = service.quantity || 1;
+      return total + (duration * quantity);
+    }, 
     0
   );
 
@@ -147,241 +168,251 @@ export default function AppointmentDetailsModal({
   const canDelete = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Detalhes do Agendamento
-            </span>
-            <Badge className={`${getStatusColor(appointment.status)} border`}>
-              {getStatusLabel(appointment.status)}
-            </Badge>
-          </DialogTitle>
-          <DialogDescription>
-            Agendamento #{appointment.id} • {format(new Date(appointment.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 mt-10" />
+                Detalhes do Agendamento
+              </span>
+              <Badge className={`${getStatusColor(appointment.status)} border`}>
+                {getStatusLabel(appointment.status)}
+              </Badge>
+            </DialogTitle>
+            <DialogDescription>
+              Agendamento #{appointment.id} • {format(new Date(appointment.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Informações do Cliente */}
-          <div className="space-y-3">
-            <h3 className="font-semibold flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Cliente
-            </h3>
-            <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-              <Avatar className="h-12 w-12">
-                <AvatarImage src={appointment.customer.avatar} alt={appointment.customer.name} />
-                <AvatarFallback>
-                  {getUserInitials(appointment.customer.name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <p className="font-medium">{appointment.customer.name}</p>
-                <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-                  {appointment.customer.phone && (
-                    <span className="flex items-center gap-1">
-                      <Phone className="h-3 w-3" />
-                      {appointment.customer.phone}
-                    </span>
-                  )}
-                  {appointment.customer.email && (
-                    <span className="flex items-center gap-1">
-                      <Mail className="h-3 w-3" />
-                      {appointment.customer.email}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Informações do Profissional */}
-          <div className="space-y-3">
-            <h3 className="font-semibold flex items-center gap-2">
-              <Scissors className="h-4 w-4" />
-              Profissional
-            </h3>
-            <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-              <Avatar className="h-12 w-12">
-                <AvatarImage src={appointment.professional.avatar} alt={appointment.professional.name} />
-                <AvatarFallback>
-                  {getUserInitials(appointment.professional.name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <p className="font-medium">{appointment.professional.name}</p>
-                {appointment.professional.specialty && (
-                  <p className="text-sm text-muted-foreground">
-                    {appointment.professional.specialty}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Data e Horário */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <h4 className="font-medium flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Data
-              </h4>
-              <p className="text-lg">
-                {format(new Date(appointment.startTime), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {format(new Date(appointment.startTime), "EEEE", { locale: ptBR })}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="font-medium flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Horário
-              </h4>
-              <p className="text-lg">
-                {format(new Date(appointment.startTime), 'HH:mm')} - {format(new Date(appointment.endTime), 'HH:mm')}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {totalDuration} minutos
-              </p>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Serviços */}
-          <div className="space-y-3">
-            <h3 className="font-semibold">Serviços</h3>
+          <div className="space-y-6">
+            {/* Informações do Cliente */}
             <div className="space-y-3">
-              {appointment.services.map((appointmentService, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex-1">
-                    <p className="font-medium">{appointmentService.service.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {appointmentService.service.duration} min • Quantidade: {appointmentService.quantity}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">R$ {safeToFixed(appointmentService.price)}</p>
-                    {appointmentService.quantity > 1 && (
-                      <p className="text-sm text-muted-foreground">
-                        R$ {safeToFixed(safeNumber(appointmentService.price) / appointmentService.quantity)} cada
-                      </p>
+              <h3 className="font-semibold flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Cliente
+              </h3>
+              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                <Avatar className="h-12 w-12">
+                  <AvatarImage src={appointment.customer.avatar} alt={appointment.customer.name} />
+                  <AvatarFallback>
+                    {getUserInitials(appointment.customer.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <p className="font-medium">{appointment.customer.name}</p>
+                  <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+                    {appointment.customer.phone && (
+                      <span className="flex items-center gap-1">
+                        <Phone className="h-3 w-3" />
+                        {appointment.customer.phone}
+                      </span>
+                    )}
+                    {appointment.customer.email && (
+                      <span className="flex items-center gap-1">
+                        <Mail className="h-3 w-3" />
+                        {appointment.customer.email}
+                      </span>
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Resumo Financeiro */}
-          <div className="space-y-3">
-            <h3 className="font-semibold flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Resumo Financeiro
-            </h3>
-            <div className="space-y-2 p-4 bg-muted rounded-lg">
-              <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <span>R$ {safeToFixed(safeNumber(appointment.totalAmount) + safeNumber(appointment.discount))}</span>
               </div>
-              {safeNumber(appointment.discount) > 0 && (
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Desconto:</span>
-                  <span>- R$ {safeToFixed(appointment.discount)}</span>
+            </div>
+
+            {/* Informações do Profissional */}
+            <div className="space-y-3">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Scissors className="h-4 w-4" />
+                Profissional
+              </h3>
+              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                <Avatar className="h-12 w-12">
+                  <AvatarImage src={appointment.professional.avatar} alt={appointment.professional.name} />
+                  <AvatarFallback>
+                    {getUserInitials(appointment.professional.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <p className="font-medium">{appointment.professional.name}</p>
+                  {appointment.professional.specialty && (
+                    <p className="text-sm text-muted-foreground">
+                      {appointment.professional.specialty}
+                    </p>
+                  )}
                 </div>
-              )}
-              <Separator />
-              <div className="flex justify-between font-semibold text-lg">
-                <span>Total:</span>
-                <span>R$ {safeToFixed(appointment.totalAmount)}</span>
               </div>
             </div>
-          </div>
 
-          {/* Observações */}
-          {appointment.notes && (
-            <>
-              <Separator />
-              <div className="space-y-3">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Observações
-                </h3>
-                <p className="text-sm p-3 bg-muted rounded-lg">
-                  {appointment.notes}
+            <Separator />
+
+            {/* Data e Horário */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Data
+                </h4>
+                <p className="text-lg">
+                  {format(new Date(appointment.startTime), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {format(new Date(appointment.startTime), "EEEE", { locale: ptBR })}
                 </p>
               </div>
-            </>
-          )}
 
-          {/* Ações */}
-          <Separator />
-          <div className="flex flex-wrap gap-2 justify-between">
-            <div className="flex gap-2">
-              {canEdit && (
-                <Button
-                  variant="outline"
-                  onClick={() => onEdit(appointment)}
-                  disabled={loading}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Editar
-                </Button>
-              )}
-
-              {canDelete && (
-                <Button
-                  variant="outline"
-                  onClick={() => onDelete(appointment.id)}
-                  disabled={loading}
-                  className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Excluir
-                </Button>
-              )}
+              <div className="space-y-2">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Horário
+                </h4>
+                <p className="text-lg">
+                  {format(new Date(appointment.startTime), 'HH:mm')} - {format(new Date(appointment.endTime), 'HH:mm')}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {totalDuration > 0 ? `${totalDuration} minutos` : 'Duração não informada'}
+                </p>
+              </div>
             </div>
 
-            {/* Ações de Status */}
-            {getAvailableActions(appointment.status).length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button disabled={loading}>
-                    Alterar Status
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Ações Disponíveis</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {getAvailableActions(appointment.status).map((action) => {
-                    const buttonConfig = getActionButton(action);
-                    const Icon = buttonConfig.icon;
-                    return (
-                      <DropdownMenuItem
-                        key={action}
-                        onClick={() => onStatusChange(appointment.id, action)}
-                        className={buttonConfig.className}
-                      >
-                        <Icon className="h-4 w-4 mr-2" />
-                        {buttonConfig.label}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
+            <Separator />
+
+            {/* Serviços */}
+            <div className="space-y-3">
+              <h3 className="font-semibold">Serviços</h3>
+              <div className="space-y-3">
+                {appointment.services.map((appointmentService, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium">{appointmentService.service.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {appointmentService.service?.duration || 30} min • Quantidade: {appointmentService.quantity}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">R$ {safeToFixed(appointmentService.price)}</p>
+                      {appointmentService.quantity > 1 && (
+                        <p className="text-sm text-muted-foreground">
+                          R$ {safeToFixed(safeNumber(appointmentService.price) / appointmentService.quantity)} cada
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Resumo Financeiro */}
+            <div className="space-y-3">
+              <h3 className="font-semibold flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Resumo Financeiro
+              </h3>
+              <div className="space-y-2 p-4 bg-muted rounded-lg">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>R$ {safeToFixed(safeNumber(appointment.totalAmount) + safeNumber(appointment.discount))}</span>
+                </div>
+                {safeNumber(appointment.discount) > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Desconto:</span>
+                    <span>- R$ {safeToFixed(appointment.discount)}</span>
+                  </div>
+                )}
+                <Separator />
+                <div className="flex justify-between font-semibold text-lg">
+                  <span>Total:</span>
+                  <span>R$ {safeToFixed(appointment.totalAmount)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Observações */}
+            {appointment.notes && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Observações
+                  </h3>
+                  <p className="text-sm p-3 bg-muted rounded-lg">
+                    {appointment.notes}
+                  </p>
+                </div>
+              </>
             )}
+
+            {/* Ações */}
+            <Separator />
+            <div className="flex flex-wrap gap-2 justify-between">
+              <div className="flex gap-2">
+                {canEdit && (
+                  <Button
+                    variant="outline"
+                    onClick={() => onEdit(appointment)}
+                    disabled={loading}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar
+                  </Button>
+                )}
+
+                {canDelete && (
+                  <Button
+                    variant="outline"
+                    onClick={handleDeleteClick}
+                    disabled={loading}
+                    className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir
+                  </Button>
+                )}
+              </div>
+
+              {/* Ações de Status */}
+              {getAvailableActions(appointment.status).length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button disabled={loading}>
+                      Alterar Status
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Ações Disponíveis</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {getAvailableActions(appointment.status).map((action) => {
+                      const buttonConfig = getActionButton(action);
+                      const Icon = buttonConfig.icon;
+                      return (
+                        <DropdownMenuItem
+                          key={action}
+                          onClick={() => onStatusChange(appointment.id, action)}
+                          className={buttonConfig.className}
+                        >
+                          <Icon className="h-4 w-4 mr-2" />
+                          {buttonConfig.label}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Confirmação de Exclusão */}
+      <DeleteAppointmentDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleConfirmDelete}
+        loading={loading}
+      />
+    </>
   );
 }

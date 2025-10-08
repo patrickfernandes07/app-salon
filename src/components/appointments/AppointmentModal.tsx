@@ -30,7 +30,6 @@ import appointmentService, {
   CreateAppointmentRequest,
   UpdateAppointmentRequest 
 } from '@/services/appointment.service';
-import { safeToFixed, safeNumber } from '@/lib/utils/type-guards';
 
 const appointmentSchema = z.object({
   customerId: z.number().min(1, 'Cliente é obrigatório'),
@@ -74,6 +73,7 @@ export default function AppointmentModal({
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [professionalServices, setProfessionalServices] = useState<Service[]>([]);
+  const [subtotal, setSubtotal] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
 
@@ -84,11 +84,12 @@ export default function AppointmentModal({
     watch,
     setValue,
     reset,
+    getValues,
     formState: { errors }
   } = useForm<AppointmentFormData>({
     resolver: zodResolver(appointmentSchema),
     defaultValues: {
-      services: [{ serviceId: 0, quantity: 1 }],
+      services: [],
       discount: 0,
     }
   });
@@ -102,7 +103,6 @@ export default function AppointmentModal({
   const watchedServices = watch('services');
   const watchedDiscount = watch('discount') || 0;
 
-  // Mover loadInitialData para useCallback para evitar warning
   const loadInitialData = useCallback(async (): Promise<void> => {
     try {
       const [professionalsData, customersData] = await Promise.all([
@@ -118,25 +118,45 @@ export default function AppointmentModal({
     }
   }, [user?.companyId]);
 
-  // Mover calculateTotals para useCallback para evitar warning
   const calculateTotals = useCallback((): void => {
+    // Pegar valores atuais diretamente do formulário
+    const currentServices = getValues('services');
+    const currentDiscount = getValues('discount') || 0;
+    
     let amount = 0;
     let duration = 0;
 
-    watchedServices.forEach(item => {
+    console.log('🔄 Calculando totais...', {
+      currentServices,
+      professionalServices: professionalServices.map(s => ({ id: s.id, name: s.name, price: s.price }))
+    });
+
+    currentServices.forEach(item => {
       const service = professionalServices.find(s => s.id === item.serviceId);
-      if (service && item.quantity > 0) {
-        amount += safeNumber(service.price) * item.quantity;
+      
+      if (service && item.serviceId > 0 && item.quantity > 0) {
+        const servicePrice = Number(service.price);
+        const itemTotal = servicePrice * item.quantity;
+        
+        console.log(`✅ ${service.name}: R$ ${servicePrice} x ${item.quantity} = R$ ${itemTotal}`);
+        
+        amount += itemTotal;
         duration += (service.duration || 30) * item.quantity;
+      } else {
+        console.log(`❌ Serviço não encontrado ou inválido:`, { serviceId: item.serviceId, quantity: item.quantity });
       }
     });
 
-    const discountAmount = amount * (watchedDiscount / 100);
+    console.log(`💰 Subtotal: R$ ${amount} | Desconto: ${currentDiscount}% | Duração: ${duration}min`);
+
+    setSubtotal(amount);
+    
+    const discountAmount = amount * (currentDiscount / 100);
     const finalAmount = Math.max(0, amount - discountAmount);
     
     setTotalAmount(finalAmount);
     setTotalDuration(duration);
-  }, [watchedServices, watchedDiscount, professionalServices]);
+  }, [professionalServices, getValues]);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -145,38 +165,51 @@ export default function AppointmentModal({
     }
   }, [open, loadInitialData]);
 
-  // Carregar serviços do profissional quando selecionado
+  // Preencher dados para edição ou valores selecionados (ANTES de carregar serviços)
   useEffect(() => {
-    if (watchedProfessional) {
-      loadProfessionalServices(watchedProfessional);
-    }
-  }, [watchedProfessional]);
-
-  // Calcular total e duração
-  useEffect(() => {
-    calculateTotals();
-  }, [calculateTotals]);
-
-  // Preencher dados para edição ou valores selecionados
-  useEffect(() => {
-    if (appointment) {
+    if (open && appointment) {
       setValue('customerId', appointment.customerId);
       setValue('professionalId', appointment.professionalId);
       setValue('date', new Date(appointment.startTime));
       setValue('startTime', format(new Date(appointment.startTime), 'HH:mm'));
-      setValue('services', appointment.services.map(s => ({
-        serviceId: s.serviceId,
-        quantity: s.quantity
-      })));
       setValue('notes', appointment.notes || '');
       setValue('discount', appointment.discount || 0);
-    } else {
-      // Para novos agendamentos, preencha com valores selecionados
+      
+      // Carregar serviços do profissional primeiro, depois preencher os serviços
+      loadProfessionalServices(appointment.professionalId).then(() => {
+        setValue('services', appointment.services.map(s => ({
+          serviceId: s.serviceId,
+          quantity: s.quantity
+        })));
+      });
+    } else if (open && !appointment) {
       if (selectedDate) setValue('date', selectedDate);
       if (selectedTime) setValue('startTime', selectedTime);
       if (selectedProfessional) setValue('professionalId', selectedProfessional);
     }
-  }, [appointment, selectedDate, selectedTime, selectedProfessional, setValue]);
+  }, [open, appointment, selectedDate, selectedTime, selectedProfessional, setValue]);
+
+  // Carregar serviços do profissional quando selecionado (APENAS para novos agendamentos)
+  useEffect(() => {
+    if (watchedProfessional && !appointment) {
+      loadProfessionalServices(watchedProfessional);
+      setValue('services', []);
+    }
+  }, [watchedProfessional, appointment, setValue]);
+
+  // Calcular total e duração quando serviços, desconto ou lista de serviços do profissional mudarem
+  useEffect(() => {
+    if (professionalServices.length > 0) {
+      calculateTotals();
+    }
+  }, [watchedServices, watchedDiscount, professionalServices, calculateTotals]);
+
+  // Adicionar primeiro serviço automaticamente (APENAS para novos agendamentos)
+  useEffect(() => {
+    if (professionalServices.length > 0 && !appointment && fields.length === 0) {
+      append({ serviceId: professionalServices[0].id, quantity: 1 });
+    }
+  }, [professionalServices, appointment, fields.length, append]);
 
   const loadProfessionalServices = async (professionalId: number): Promise<void> => {
     try {
@@ -206,13 +239,11 @@ export default function AppointmentModal({
     return format(endDate, 'HH:mm');
   };
 
-  // Função para validar se o horário é no passado
   const isTimeInPast = (date: Date, time: string): boolean => {
     const now = new Date();
     const selectedDateTime = new Date(date);
     const [hours, minutes] = time.split(':').map(Number);
     selectedDateTime.setHours(hours, minutes, 0, 0);
-    
     return selectedDateTime < now;
   };
 
@@ -227,7 +258,6 @@ export default function AppointmentModal({
 
       const endDateTime = addMinutes(startDateTime, totalDuration || 60);
 
-      // Verificar disponibilidade apenas se não for edição ou se mudou o horário/profissional
       const needsAvailabilityCheck = !appointment || 
         appointment.startTime !== startDateTime.toISOString() ||
         appointment.professionalId !== data.professionalId;
@@ -246,7 +276,6 @@ export default function AppointmentModal({
       }
 
       if (appointment) {
-        // Payload para UPDATE - apenas campos aceitos pelo UpdateAppointmentDto
         const updateData = {
           startTime: startDateTime.toISOString(),
           endTime: endDateTime.toISOString(),
@@ -254,10 +283,8 @@ export default function AppointmentModal({
           notes: data.notes,
           discount: data.discount || 0,
         };
-
         await appointmentService.updateAppointment(appointment.id, updateData as UpdateAppointmentRequest);
       } else {
-        // Payload para CREATE - todos os campos necessários
         const createData = {
           customerId: data.customerId,
           professionalId: data.professionalId,
@@ -268,14 +295,12 @@ export default function AppointmentModal({
           notes: data.notes,
           discount: data.discount || 0,
         };
-
         await appointmentService.createAppointment(createData as CreateAppointmentRequest);
       }
 
       onSuccess();
       handleClose();
     } catch (error: unknown) {
-      // Tipagem mais específica para o erro
       const errorMessage = error instanceof Error 
         ? error.message 
         : 'Erro ao salvar agendamento';
@@ -289,13 +314,18 @@ export default function AppointmentModal({
     reset();
     setError('');
     setProfessionalServices([]);
+    setSubtotal(0);
     setTotalAmount(0);
     setTotalDuration(0);
     onClose();
   };
 
   const addService = (): void => {
-    append({ serviceId: 0, quantity: 1 });
+    if (watchedProfessional && professionalServices.length > 0) {
+      append({ serviceId: professionalServices[0].id, quantity: 1 });
+    } else {
+      setError('Selecione um profissional primeiro');
+    }
   };
 
   const removeService = (index: number): void => {
@@ -324,10 +354,8 @@ export default function AppointmentModal({
             </Alert>
           )}
 
-          {/* Informações Básicas */}
           <div className="space-y-4">
-            {/* Cliente e Profissional - Stack em mobile, side-by-side em desktop */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               {/* Cliente */}
               <div className="space-y-2">
                 <Label htmlFor="customerId" className="text-sm font-medium">
@@ -348,9 +376,7 @@ export default function AppointmentModal({
                       <SelectContent>
                         {customers.map((customer) => (
                           <SelectItem key={customer.id} value={customer.id.toString()}>
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="truncate">{customer.name}</span>
-                            </div>
+                            <span className="truncate">{customer.name}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -401,7 +427,6 @@ export default function AppointmentModal({
 
             {/* Data e Horário */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Data */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Data *</Label>
                 <Controller
@@ -410,17 +435,10 @@ export default function AppointmentModal({
                   render={({ field }) => (
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                        >
+                        <Button variant="outline" className="w-full justify-start text-left font-normal">
                           <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
                           <span className="truncate">
-                            {field.value ? (
-                              format(field.value, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
-                            ) : (
-                              "Selecione uma data"
-                            )}
+                            {field.value ? format(field.value, "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : "Selecione uma data"}
                           </span>
                         </Button>
                       </PopoverTrigger>
@@ -436,21 +454,13 @@ export default function AppointmentModal({
                     </Popover>
                   )}
                 />
-                {errors.date && (
-                  <p className="text-xs text-destructive">{errors.date.message}</p>
-                )}
+                {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
               </div>
 
-              {/* Horário */}
               <div className="space-y-2">
                 <Label htmlFor="startTime" className="text-sm font-medium">
                   <Clock className="h-4 w-4 inline mr-2" />
                   Horário *
-                  {selectedTime && !appointment && (
-                    <span className="text-xs text-muted-foreground ml-2">
-                      (Horário selecionado: {selectedTime})
-                    </span>
-                  )}
                 </Label>
                 <Controller
                   name="startTime"
@@ -464,14 +474,8 @@ export default function AppointmentModal({
                         {generateTimeSlots().map((time) => {
                           const isPast = watch('date') && isTimeInPast(watch('date'), time);
                           return (
-                            <SelectItem 
-                              key={time} 
-                              value={time}
-                              disabled={isPast}
-                              className={isPast ? 'opacity-50' : ''}
-                            >
-                              {time}
-                              {isPast && <span className="text-xs ml-2">(passado)</span>}
+                            <SelectItem key={time} value={time} disabled={isPast}>
+                              {time} {isPast && <span className="text-xs">(passado)</span>}
                             </SelectItem>
                           );
                         })}
@@ -479,9 +483,7 @@ export default function AppointmentModal({
                     </Select>
                   )}
                 />
-                {errors.startTime && (
-                  <p className="text-xs text-destructive">{errors.startTime.message}</p>
-                )}
+                {errors.startTime && <p className="text-xs text-destructive">{errors.startTime.message}</p>}
                 {watch('startTime') && totalDuration > 0 && (
                   <p className="text-xs text-muted-foreground">
                     Término previsto: {calculateEndTime(watch('startTime'), totalDuration)}
@@ -505,11 +507,9 @@ export default function AppointmentModal({
 
             <div className="space-y-3">
               {fields.map((field, index) => (
-                <div key={field.id} className="p-4 border rounded-lg space-y-4">
-                  {/* Grid responsivo para serviços */}
+                <div key={field.id} className="p-4 border rounded-lg">
                   <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {/* Serviço */}
-                    <div className="space-y-2 sm:col-span-2 lg:col-span-2">
+                    <div className="space-y-2 sm:col-span-2">
                       <Label className="text-sm">Serviço</Label>
                       <Controller
                         name={`services.${index}.serviceId`}
@@ -517,7 +517,11 @@ export default function AppointmentModal({
                         render={({ field: serviceField }) => (
                           <Select
                             value={serviceField.value?.toString()}
-                            onValueChange={(value) => serviceField.onChange(parseInt(value))}
+                            onValueChange={(value) => {
+                              serviceField.onChange(parseInt(value));
+                              // Forçar recálculo após a mudança
+                              requestAnimationFrame(() => calculateTotals());
+                            }}
                           >
                             <SelectTrigger className="w-full">
                               <SelectValue placeholder="Selecione o serviço" />
@@ -528,7 +532,7 @@ export default function AppointmentModal({
                                   <div className="flex flex-col items-start min-w-0">
                                     <span className="truncate font-medium">{service.name}</span>
                                     <span className="text-xs text-muted-foreground">
-                                      R$ {safeToFixed(service.price)} • {service.duration || 30}min
+                                      R$ {Number(service.price).toFixed(2)} • {service.duration || 30}min
                                     </span>
                                   </div>
                                 </SelectItem>
@@ -539,18 +543,21 @@ export default function AppointmentModal({
                       />
                     </div>
 
-                    {/* Quantidade */}
                     <div className="space-y-2">
                       <Label className="text-sm">Quantidade</Label>
                       <Input
                         type="number"
                         min="1"
                         className="w-full"
-                        {...register(`services.${index}.quantity`, { valueAsNumber: true })}
+                        {...register(`services.${index}.quantity`, { 
+                          valueAsNumber: true,
+                          onChange: () => {
+                            requestAnimationFrame(() => calculateTotals());
+                          }
+                        })}
                       />
                     </div>
 
-                    {/* Botão remover */}
                     <div className="flex items-end">
                       {fields.length > 1 && (
                         <Button
@@ -561,8 +568,7 @@ export default function AppointmentModal({
                           className="w-full"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
-                          <span className="hidden sm:inline">Remover</span>
-                          <span className="sm:hidden">Remover</span>
+                          Remover
                         </Button>
                       )}
                     </div>
@@ -571,16 +577,13 @@ export default function AppointmentModal({
               ))}
             </div>
 
-            {errors.services && (
-              <p className="text-xs text-destructive">{errors.services.message}</p>
-            )}
+            {errors.services && <p className="text-xs text-destructive">{errors.services.message}</p>}
           </div>
 
           <Separator />
 
           {/* Observações e Resumo */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Observações */}
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="notes" className="text-sm font-medium">Observações</Label>
@@ -604,7 +607,12 @@ export default function AppointmentModal({
                   step="0.01"
                   placeholder="0"
                   className="w-full"
-                  {...register('discount', { valueAsNumber: true })}
+                  {...register('discount', { 
+                    valueAsNumber: true,
+                    onChange: () => {
+                      requestAnimationFrame(() => calculateTotals());
+                    }
+                  })}
                 />
               </div>
             </div>
@@ -615,18 +623,18 @@ export default function AppointmentModal({
               <div className="p-4 bg-muted rounded-lg space-y-3">
                 <div className="flex justify-between text-sm">
                   <span>Subtotal:</span>
-                  <span className="font-medium">R$ {safeToFixed(totalAmount + (totalAmount * (watchedDiscount / 100)))}</span>
+                  <span className="font-medium">R$ {subtotal.toFixed(2)}</span>
                 </div>
                 {watchedDiscount > 0 && (
                   <div className="flex justify-between text-sm text-muted-foreground">
                     <span>Desconto ({watchedDiscount}%):</span>
-                    <span>- R$ {safeToFixed((totalAmount + (totalAmount * (watchedDiscount / 100))) * (watchedDiscount / 100))}</span>
+                    <span>- R$ {(subtotal * (watchedDiscount / 100)).toFixed(2)}</span>
                   </div>
                 )}
                 <Separator />
                 <div className="flex justify-between font-semibold">
                   <span>Total:</span>
-                  <span className="text-lg">R$ {safeToFixed(totalAmount)}</span>
+                  <span className="text-lg">R$ {totalAmount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm text-muted-foreground">
                   <span>Duração:</span>
@@ -636,7 +644,6 @@ export default function AppointmentModal({
             </div>
           </div>
 
-          {/* Footer com botões */}
           <DialogFooter className="flex flex-col sm:flex-row gap-3 pt-4">
             <Button type="button" variant="outline" onClick={handleClose} className="w-full sm:w-auto">
               Cancelar

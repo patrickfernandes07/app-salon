@@ -30,6 +30,7 @@ import appointmentService, {
   CreateAppointmentRequest,
   UpdateAppointmentRequest 
 } from '@/services/appointment.service';
+import { formatCurrency } from '@/lib/utils/currency';
 
 const appointmentSchema = z.object({
   customerId: z.number().min(1, 'Cliente é obrigatório'),
@@ -126,10 +127,6 @@ export default function AppointmentModal({
     let amount = 0;
     let duration = 0;
 
-    console.log('🔄 Calculando totais...', {
-      currentServices,
-      professionalServices: professionalServices.map(s => ({ id: s.id, name: s.name, price: s.price }))
-    });
 
     currentServices.forEach(item => {
       const service = professionalServices.find(s => s.id === item.serviceId);
@@ -137,18 +134,10 @@ export default function AppointmentModal({
       if (service && item.serviceId > 0 && item.quantity > 0) {
         const servicePrice = Number(service.price);
         const itemTotal = servicePrice * item.quantity;
-        
-        console.log(`✅ ${service.name}: R$ ${servicePrice} x ${item.quantity} = R$ ${itemTotal}`);
-        
         amount += itemTotal;
         duration += (service.duration || 30) * item.quantity;
-      } else {
-        console.log(`❌ Serviço não encontrado ou inválido:`, { serviceId: item.serviceId, quantity: item.quantity });
-      }
+      } 
     });
-
-    console.log(`💰 Subtotal: R$ ${amount} | Desconto: ${currentDiscount}% | Duração: ${duration}min`);
-
     setSubtotal(amount);
     
     const discountAmount = amount * (currentDiscount / 100);
@@ -532,7 +521,7 @@ export default function AppointmentModal({
                                   <div className="flex flex-col items-start min-w-0">
                                     <span className="truncate font-medium">{service.name}</span>
                                     <span className="text-xs text-muted-foreground">
-                                      R$ {Number(service.price).toFixed(2)} • {service.duration || 30}min
+                                      {formatCurrency(service.price)} • {service.duration || 30}min
                                     </span>
                                   </div>
                                 </SelectItem>
@@ -623,18 +612,18 @@ export default function AppointmentModal({
               <div className="p-4 bg-muted rounded-lg space-y-3">
                 <div className="flex justify-between text-sm">
                   <span>Subtotal:</span>
-                  <span className="font-medium">R$ {subtotal.toFixed(2)}</span>
+                  <span className="font-medium">{formatCurrency(subtotal)}</span>
                 </div>
                 {watchedDiscount > 0 && (
                   <div className="flex justify-between text-sm text-muted-foreground">
                     <span>Desconto ({watchedDiscount}%):</span>
-                    <span>- R$ {(subtotal * (watchedDiscount / 100)).toFixed(2)}</span>
+                    <span>- {formatCurrency(subtotal * (watchedDiscount / 100))}</span>
                   </div>
                 )}
                 <Separator />
                 <div className="flex justify-between font-semibold">
                   <span>Total:</span>
-                  <span className="text-lg">R$ {totalAmount.toFixed(2)}</span>
+                  <span className="text-lg">{formatCurrency(totalAmount)}</span>
                 </div>
                 <div className="flex justify-between text-sm text-muted-foreground">
                   <span>Duração:</span>

@@ -63,7 +63,6 @@ class AuthService {
         "/auth/login",
         credentials
       );
-      console.log(response);
       if (response.data) {
         const { accessToken, refreshToken, user } = response.data;
 

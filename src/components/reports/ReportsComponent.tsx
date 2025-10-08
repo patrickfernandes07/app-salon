@@ -44,9 +44,6 @@ export function ReportsComponent() {
   };
 
   const handleExport = () => {
-    // Implementar exportação de relatórios (PDF/Excel)
-    console.log("Exportar relatórios");
-    // Você pode usar bibliotecas como jsPDF ou xlsx
   };
 
   if (loading && !financialDashboard) {

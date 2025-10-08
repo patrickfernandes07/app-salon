@@ -1,12 +1,13 @@
 // src/components/calendar/AppointmentCalendar.tsx
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
+import ptBrLocale from '@fullcalendar/core/locales/pt-br';
 import { 
   DateSelectArg, 
   EventClickArg, 
@@ -26,7 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/auth.context';
 import appointmentService, { Appointment, Professional } from '@/services/appointment.service';
-import { safeToFixed } from '@/lib/utils/type-guards';
+import { formatCurrency } from '@/lib/utils/currency';
 import AppointmentModal from '../appointments/AppointmentModal';
 import AppointmentDetailsModal from '../appointments/AppointmentDetailsModal';
 
@@ -75,6 +76,25 @@ interface ValidationResult {
   message?: string;
 }
 
+// Configurações constantes fora do componente
+const CALENDAR_PLUGINS = [dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin];
+const CALENDAR_LOCALES = [ptBrLocale];
+
+const STATUS_COLORS: Record<StatusType, StatusColors> = {
+  SCHEDULED: { bg: '#3B82F6', border: '#2563EB', text: '#FFFFFF' },
+  CONFIRMED: { bg: '#10B981', border: '#059669', text: '#FFFFFF' },
+  IN_PROGRESS: { bg: '#F59E0B', border: '#D97706', text: '#FFFFFF' },
+  COMPLETED: { bg: '#06B6D4', border: '#0891B2', text: '#FFFFFF' },
+  CANCELLED: { bg: '#EF4444', border: '#DC2626', text: '#FFFFFF' },
+  NO_SHOW: { bg: '#6B7280', border: '#4B5563', text: '#FFFFFF' },
+};
+
+const BUSINESS_HOURS = {
+  daysOfWeek: [1, 2, 3, 4, 5, 6],
+  startTime: '08:00',
+  endTime: '20:00',
+};
+
 export default function AppointmentCalendar() {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -82,30 +102,75 @@ export default function AppointmentCalendar() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedProfessional, setSelectedProfessional] = useState<number | 'all'>('all');
-  const [calendarView] = useState('timeGridWeek');
+  const [calendarView, setCalendarView] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768 ? 'timeGridDay' : 'timeGridWeek';
+    }
+    return 'timeGridWeek';
+  });
   const [currentDate, setCurrentDate] = useState(new Date());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const calendarRef = useRef<any>(null);
+
+  // Ajustar visualização baseado no tamanho da tela
+  useEffect(() => {
+    const handleResize = () => {
+      const newView = window.innerWidth < 768 ? 'timeGridDay' : 'timeGridWeek';
+      setCalendarView(newView);
+      
+      // Forçar o FullCalendar a atualizar a view
+      if (calendarRef.current) {
+        const calendarApi = calendarRef.current.getApi();
+        calendarApi.changeView(newView);
+      }
+    };
+
+    // Adicionar listener
+    window.addEventListener('resize', handleResize);
+
+    // Cleanup
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Modals
   const [appointmentModalOpen, setAppointmentModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [appointmentToDelete, setAppointmentToDelete] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
-  // Transformar loadProfessionals em useCallback
-  const loadProfessionals = useCallback(async (): Promise<void> => {
-    try {
-      const data = await appointmentService.getProfessionals(user?.companyId);
-      setProfessionals(data);
-    } catch (error) {
-      console.error('Erro ao carregar profissionais:', error);
-    }
+  const getStatusColor = useCallback((status: string): StatusColors => {
+    return STATUS_COLORS[status as StatusType] || STATUS_COLORS.SCHEDULED;
+  }, []);
+
+  // Carregar profissionais apenas uma vez
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProfessionals = async () => {
+      if (!user?.companyId) return;
+      
+      try {
+        const data = await appointmentService.getProfessionals(user.companyId);
+        if (isMounted) {
+          setProfessionals(data);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar profissionais:', error);
+      }
+    };
+
+    loadProfessionals();
+
+    return () => {
+      isMounted = false;
+    };
   }, [user?.companyId]);
 
-  // Transformar loadAppointments em useCallback
-  const loadAppointments = useCallback(async (): Promise<void> => {
+  // Carregar agendamentos
+  const loadAppointments = useCallback(async () => {
+    if (!user?.companyId) return;
+
     try {
       setLoading(true);
       setError('');
@@ -116,11 +181,11 @@ export default function AppointmentCalendar() {
       const params: AppointmentParams = {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
-        companyId: user?.companyId,
-        ...(selectedProfessional !== 'all' && { professionalId: selectedProfessional as number })
+        companyId: user.companyId,
       };
 
       const data = await appointmentService.getAppointments(params);
+      
       setAppointments(data);
     } catch (error) {
       setError('Erro ao carregar agendamentos');
@@ -128,34 +193,22 @@ export default function AppointmentCalendar() {
     } finally {
       setLoading(false);
     }
-  }, [user?.companyId, currentDate, selectedProfessional]);
+  }, [user?.companyId, currentDate]);
 
-  useEffect(() => {
-    loadProfessionals();
-    loadAppointments();
-  }, [loadProfessionals, loadAppointments]);
-
+  // Carregar agendamentos quando necessário
   useEffect(() => {
     loadAppointments();
   }, [loadAppointments]);
 
-  const getStatusColor = (status: string): StatusColors => {
-    const colors: Record<StatusType, StatusColors> = {
-      SCHEDULED: { bg: '#3B82F6', border: '#2563EB', text: '#FFFFFF' },
-      CONFIRMED: { bg: '#10B981', border: '#059669', text: '#FFFFFF' },
-      IN_PROGRESS: { bg: '#F59E0B', border: '#D97706', text: '#FFFFFF' },
-      COMPLETED: { bg: '#06B6D4', border: '#0891B2', text: '#FFFFFF' },
-      CANCELLED: { bg: '#EF4444', border: '#DC2626', text: '#FFFFFF' },
-      NO_SHOW: { bg: '#6B7280', border: '#4B5563', text: '#FFFFFF' },
-    };
-    return colors[status as StatusType] || colors.SCHEDULED;
-  };
-
-  const convertAppointmentsToEvents = useCallback((appointments: Appointment[]): CalendarEvent[] => {
-    return appointments.map((appointment) => {
+  // Converter appointments para eventos - MEMOIZADO
+  const calendarEvents = useMemo(() => {
+    const filteredAppointments = selectedProfessional === 'all' 
+      ? appointments 
+      : appointments.filter(apt => apt.professionalId === selectedProfessional);
+    
+    return filteredAppointments.map((appointment) => {
       const colors = getStatusColor(appointment.status);
       
-      // Verificação defensiva para evitar erros
       const customerName = appointment?.customer?.name || 'Cliente não informado';
       const services = appointment?.services?.map(s => s?.service?.name || 'Serviço') || [];
       const servicesText = services.length > 0 ? services.join(', ') : 'Serviços não informados';
@@ -177,10 +230,10 @@ export default function AppointmentCalendar() {
         },
       };
     });
-  }, []);
+  }, [appointments, selectedProfessional, getStatusColor]);
 
   // Função para validar se o horário selecionado é válido
-  const validateSelectedTime = (date: Date, time: string): ValidationResult => {
+  const validateSelectedTime = useCallback((date: Date, time: string): ValidationResult => {
     const selectedDateTime = new Date(date);
     const [hours, minutes] = time.split(':').map(Number);
     selectedDateTime.setHours(hours, minutes, 0, 0);
@@ -192,7 +245,7 @@ export default function AppointmentCalendar() {
     }
     
     const dayOfWeek = selectedDateTime.getDay();
-    if (dayOfWeek === 0) { // Domingo
+    if (dayOfWeek === 0) {
       return { valid: false, message: 'Agendamentos não são permitidos aos domingos' };
     }
     
@@ -201,22 +254,17 @@ export default function AppointmentCalendar() {
     }
     
     return { valid: true };
-  };
+  }, []);
 
-  const handleDateSelect = (selectInfo: DateSelectArg): void => {
+  const handleDateSelect = useCallback((selectInfo: DateSelectArg): void => {
     const selectedDate = selectInfo.start;
     
-    // Usar o horário local diretamente sem conversões
     const timeString = selectedDate.toLocaleTimeString('pt-BR', { 
       hour: '2-digit', 
       minute: '2-digit',
       hour12: false 
     });
     
-    console.log('Data selecionada:', selectedDate);
-    console.log('Horário extraído:', timeString);
-    
-    // Validar se o horário é válido
     const validation = validateSelectedTime(selectedDate, timeString);
     
     if (!validation.valid) {
@@ -228,28 +276,28 @@ export default function AppointmentCalendar() {
     setSelectedTime(timeString);
     setSelectedAppointment(null);
     setAppointmentModalOpen(true);
-  };
+  }, [validateSelectedTime]);
 
-  const handleEventClick = (clickInfo: EventClickArg): void => {
+  const handleEventClick = useCallback((clickInfo: EventClickArg): void => {
     const appointment = clickInfo.event.extendedProps.appointment as Appointment;
     setSelectedAppointment(appointment);
     setDetailsModalOpen(true);
-  };
+  }, []);
 
-  const handleCreateAppointment = (): void => {
+  const handleCreateAppointment = useCallback((): void => {
     setSelectedDate(null);
     setSelectedTime(null);
     setSelectedAppointment(null);
     setAppointmentModalOpen(true);
-  };
+  }, []);
 
-  const handleEditAppointment = (appointment: Appointment): void => {
+  const handleEditAppointment = useCallback((appointment: Appointment): void => {
     setSelectedAppointment(appointment);
     setDetailsModalOpen(false);
     setAppointmentModalOpen(true);
-  };
+  }, []);
 
-  const handleStatusChange = async (appointmentId: number, action: string): Promise<void> => {
+  const handleStatusChange = useCallback(async (appointmentId: number, action: string): Promise<void> => {
     try {
       setLoading(true);
       
@@ -271,50 +319,41 @@ export default function AppointmentCalendar() {
           break;
       }
       
-      loadAppointments();
+      await loadAppointments();
       setDetailsModalOpen(false);
     } catch (error) {
       console.error('Erro ao alterar status:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadAppointments]);
 
-  const handleDeleteAppointment = (appointmentId: number): void => {
-    setAppointmentToDelete(appointmentId);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleConfirmDelete = async (): Promise<void> => {
-    if (!appointmentToDelete) return;
-
+  const handleDeleteAppointment = useCallback(async (appointmentId: number): Promise<void> => {
     try {
       setLoading(true);
-      await appointmentService.deleteAppointment(appointmentToDelete);
-      loadAppointments();
-      setDetailsModalOpen(false);
-      setDeleteDialogOpen(false);
-      setAppointmentToDelete(null);
+      
+      await appointmentService.deleteAppointment(appointmentId);
+      
+      await loadAppointments();
+      
     } catch (error) {
-      console.error('Erro ao excluir agendamento:', error);
+      console.error('❌ Erro ao excluir agendamento:', error);
+      setError('Erro ao excluir agendamento');
+      throw error;
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadAppointments]);
 
-  const handleDateClick = (dateClickInfo: { date: Date; view: { type: string } }): void => {
+  const handleDateClick = useCallback((dateClickInfo: { date: Date; view: { type: string } }): void => {
     if (dateClickInfo.view.type !== 'dayGridMonth') {
       const selectedDate = dateClickInfo.date;
       
-      // Usar o horário local diretamente
       const timeString = selectedDate.toLocaleTimeString('pt-BR', { 
         hour: '2-digit', 
         minute: '2-digit',
         hour12: false 
       });
-      
-      console.log('DateClick - Data:', selectedDate);
-      console.log('DateClick - Horário:', timeString);
       
       const validation = validateSelectedTime(selectedDate, timeString);
       
@@ -328,19 +367,17 @@ export default function AppointmentCalendar() {
       setSelectedAppointment(null);
       setAppointmentModalOpen(true);
     }
-  };
+  }, [validateSelectedTime]);
 
-  const handleDatesSet = (dateInfo: DatesSetArg): void => {
+  const handleDatesSet = useCallback((dateInfo: DatesSetArg): void => {
     setCurrentDate(dateInfo.start);
-  };
+  }, []);
 
-  const renderEventContent = (eventInfo: EventContentArg) => {
+  const renderEventContent = useCallback((eventInfo: EventContentArg) => {
     const { appointment } = eventInfo.event.extendedProps;
     
-    // Verificar se os dados existem antes de usar
     const customerName = appointment?.customer?.name || 'Cliente não informado';
     
-    // Tipagem explícita para os serviços
     const services = (appointment?.services as ServiceInfo[] || [])
       .map(s => s?.service?.name || 'Serviço')
       .join(', ') || 'Serviços não informados';
@@ -361,14 +398,12 @@ export default function AppointmentCalendar() {
             {professionalName}
           </span>
           <span className="font-medium">
-            R$ {safeToFixed(totalAmount)}
+            {formatCurrency(totalAmount)}
           </span>
         </div>
       </div>
     );
-  };
-
-  const calendarEvents = convertAppointmentsToEvents(appointments);
+  }, []);
 
   return (
     <>
@@ -485,8 +520,10 @@ export default function AppointmentCalendar() {
           <CardContent className="p-6">
             <div style={{ height: '700px' }}>
               <FullCalendar
-                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
+                plugins={CALENDAR_PLUGINS}
                 initialView={calendarView}
+                locales={CALENDAR_LOCALES}
+                locale='pt-br'
                 headerToolbar={{
                   left: 'prev,next today',
                   center: 'title',
@@ -499,15 +536,9 @@ export default function AppointmentCalendar() {
                 weekends={true}
                 eventClick={handleEventClick}
                 select={handleDateSelect}
-                
-                // Configurações para capturar cliques em horários
                 selectMinDistance={0}
                 selectOverlap={false}
-                
-                // Callback para cliques simples em slots vazios
                 dateClick={handleDateClick}
-                
-                locale="pt-br"
                 timeZone="local"
                 slotMinTime="08:00:00"
                 slotMaxTime="20:00:00"
@@ -528,11 +559,7 @@ export default function AppointmentCalendar() {
                   minute: '2-digit',
                   hour12: false
                 }}
-                businessHours={{
-                  daysOfWeek: [1, 2, 3, 4, 5, 6],
-                  startTime: '08:00',
-                  endTime: '20:00',
-                }}
+                businessHours={BUSINESS_HOURS}
                 aspectRatio={typeof window !== 'undefined' && window.innerWidth < 768 ? 1.0 : 1.35}
                 views={{
                   timeGridWeek: {

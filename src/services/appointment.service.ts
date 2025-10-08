@@ -181,7 +181,6 @@ class AppointmentService {
     id: number,
     data: UpdateAppointmentRequest
   ): Promise<Appointment> {
-    console.log(data);
     const response = await apiService.patch<Appointment>(
       `/appointments/${id}`,
       data

@@ -38,7 +38,8 @@ import {
 
 import { Appointment } from '@/services/appointment.service';
 import { useAuth } from '@/contexts/auth.context';
-import { safeToFixed, safeNumber } from '@/lib/utils/type-guards';
+import { safeNumber } from '@/lib/utils/type-guards';
+import { formatCurrency } from '@/lib/utils/currency';
 import DeleteAppointmentDialog from './DeleteAppointmentDialog';
 
 interface AppointmentDetailsModalProps {
@@ -47,7 +48,7 @@ interface AppointmentDetailsModalProps {
   appointment: Appointment | null;
   onEdit: (appointment: Appointment) => void;
   onStatusChange: (appointmentId: number, action: string) => void;
-  onDelete: (appointmentId: number) => void;
+  onDelete: (appointmentId: number) => Promise<void>;
   loading: boolean;
 }
 
@@ -62,6 +63,7 @@ export default function AppointmentDetailsModal({
 }: AppointmentDetailsModalProps) {
   const { user } = useAuth();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (!appointment) return null;
 
@@ -145,19 +147,30 @@ export default function AppointmentDetailsModal({
     setDeleteDialogOpen(true);
   };
 
-const handleConfirmDelete = async () => {
-  try {
-    console.log('📋 Modal: Confirmando exclusão do agendamento', appointment.id);
-    await onDelete(appointment.id);
-    setDeleteDialogOpen(false);
-  } catch (error) {
-    console.error('📋 Modal: Erro ao tentar excluir:', error);
-    // Mantém o dialog aberto em caso de erro
-  }
-};
+  const handleConfirmDelete = async () => {
+    if (!appointment) {
+      console.error('❌ Nenhum agendamento selecionado para exclusão');
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      
+      await onDelete(appointment.id);
+
+      setDeleteDialogOpen(false);
+      onClose();
+      
+    } catch (error) {
+      console.error('❌ Erro ao excluir agendamento:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const totalDuration = appointment.services.reduce(
     (total, service) => {
-      const duration = service.service?.duration || 30; // fallback para 30 minutos
+      const duration = service.service?.duration || 30;
       const quantity = service.quantity || 1;
       return total + (duration * quantity);
     }, 
@@ -174,7 +187,7 @@ const handleConfirmDelete = async () => {
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 mt-10" />
+                <Calendar className="h-5 w-5" />
                 Detalhes do Agendamento
               </span>
               <Badge className={`${getStatusColor(appointment.status)} border`}>
@@ -290,10 +303,10 @@ const handleConfirmDelete = async () => {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium">R$ {safeToFixed(appointmentService.price)}</p>
+                      <p className="font-medium">{formatCurrency(appointmentService.price)}</p>
                       {appointmentService.quantity > 1 && (
                         <p className="text-sm text-muted-foreground">
-                          R$ {safeToFixed(safeNumber(appointmentService.price) / appointmentService.quantity)} cada
+                          {formatCurrency(safeNumber(appointmentService.price) / appointmentService.quantity)} cada
                         </p>
                       )}
                     </div>
@@ -313,18 +326,18 @@ const handleConfirmDelete = async () => {
               <div className="space-y-2 p-4 bg-muted rounded-lg">
                 <div className="flex justify-between">
                   <span>Subtotal:</span>
-                  <span>R$ {safeToFixed(safeNumber(appointment.totalAmount) + safeNumber(appointment.discount))}</span>
+                  <span>{formatCurrency(safeNumber(appointment.totalAmount) + safeNumber(appointment.discount))}</span>
                 </div>
                 {safeNumber(appointment.discount) > 0 && (
                   <div className="flex justify-between text-muted-foreground">
                     <span>Desconto:</span>
-                    <span>- R$ {safeToFixed(appointment.discount)}</span>
+                    <span>- {formatCurrency(appointment.discount)}</span>
                   </div>
                 )}
                 <Separator />
                 <div className="flex justify-between font-semibold text-lg">
                   <span>Total:</span>
-                  <span>R$ {safeToFixed(appointment.totalAmount)}</span>
+                  <span>{formatCurrency(appointment.totalAmount)}</span>
                 </div>
               </div>
             </div>
@@ -353,7 +366,7 @@ const handleConfirmDelete = async () => {
                   <Button
                     variant="outline"
                     onClick={() => onEdit(appointment)}
-                    disabled={loading}
+                    disabled={loading || isDeleting}
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Editar
@@ -364,7 +377,7 @@ const handleConfirmDelete = async () => {
                   <Button
                     variant="outline"
                     onClick={handleDeleteClick}
-                    disabled={loading}
+                    disabled={loading || isDeleting}
                     className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -377,7 +390,7 @@ const handleConfirmDelete = async () => {
               {getAvailableActions(appointment.status).length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button disabled={loading}>
+                    <Button disabled={loading || isDeleting}>
                       Alterar Status
                     </Button>
                   </DropdownMenuTrigger>
@@ -411,7 +424,7 @@ const handleConfirmDelete = async () => {
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
-        loading={loading}
+        loading={isDeleting}
       />
     </>
   );

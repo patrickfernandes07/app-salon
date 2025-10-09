@@ -52,3 +52,11 @@ export interface ServiceFilters {
   category?: ServiceCategory;
   isActive?: boolean;
 }
+
+export interface ProfessionalService {
+  id: number;
+  professionalId: number;
+  serviceId: number;
+  customPrice?: number;
+  service?: Service;
+}

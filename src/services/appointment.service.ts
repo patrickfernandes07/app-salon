@@ -34,6 +34,7 @@ export interface Appointment {
     specialty?: string;
   };
   services: AppointmentServices[];
+  products: AppointmentProduct[];
 }
 
 export interface AppointmentServices {
@@ -50,6 +51,21 @@ export interface AppointmentServices {
   };
 }
 
+export interface AppointmentProduct {
+  id: number;
+  productId: number;
+  price: number;
+  quantity: number;
+  type: "USED" | "SOLD";
+  product: {
+    id: number;
+    name: string;
+    category: string;
+    stock: number;
+    unit: string;
+  };
+}
+
 export interface CreateAppointmentRequest {
   customerId: number;
   professionalId: number;
@@ -59,6 +75,12 @@ export interface CreateAppointmentRequest {
   services: {
     serviceId: number;
     quantity: number;
+  }[];
+  products?: {
+    productId: number;
+    quantity: number;
+    price: number;
+    type: "USED" | "SOLD";
   }[];
   notes?: string;
   discount?: number;
@@ -72,6 +94,12 @@ export interface UpdateAppointmentRequest {
   services?: {
     serviceId: number;
     quantity: number;
+  }[];
+  products?: {
+    productId: number;
+    quantity: number;
+    price: number;
+    type: "USED" | "SOLD";
   }[];
   notes?: string;
   discount?: number;
@@ -119,9 +147,31 @@ export interface Service {
   isActive: boolean;
 }
 
+export interface Product {
+  id: number;
+  name: string;
+  description?: string;
+  barcode?: string;
+  brand?: string;
+  category: string;
+  costPrice: number;
+  salePrice: number;
+  stock: number;
+  minStock: number;
+  unit: string;
+  isActive: boolean;
+  image?: string;
+}
+
 export interface AvailabilityCheck {
   available: boolean;
   conflictingAppointments?: Appointment[];
+}
+
+export interface StockCheck {
+  available: boolean;
+  currentStock: number;
+  requested: number;
 }
 
 class AppointmentService {
@@ -281,6 +331,15 @@ class AppointmentService {
       ...item.service,
       price: item.customPrice || item.service.price,
     }));
+  }
+
+  // Buscar produtos ativos
+  async getProducts(companyId?: number): Promise<Product[]> {
+    const url = companyId
+      ? `/products/active?companyId=${companyId}`
+      : "/products/active";
+    const response = await apiService.get<Product[]>(url);
+    return response.data;
   }
 }
 

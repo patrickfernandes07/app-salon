@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format, addMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarIcon, Plus, Trash2, User, Clock, DollarSign } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, User, Clock, DollarSign, Package, ShoppingCart } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { useAuth } from '@/contexts/auth.context';
 import appointmentService, { 
@@ -27,9 +28,11 @@ import appointmentService, {
   Professional, 
   Customer, 
   Service,
+  Product,
   CreateAppointmentRequest,
   UpdateAppointmentRequest 
 } from '@/services/appointment.service';
+import productService from '@/services/productService';
 import { formatCurrency } from '@/lib/utils/currency';
 
 const appointmentSchema = z.object({
@@ -43,6 +46,12 @@ const appointmentSchema = z.object({
     serviceId: z.number().min(1, 'Serviço é obrigatório'),
     quantity: z.number().min(1, 'Quantidade deve ser maior que 0'),
   })).min(1, 'Pelo menos um serviço é obrigatório'),
+  products: z.array(z.object({
+    productId: z.number().min(1, 'Produto é obrigatório'),
+    quantity: z.number().min(1, 'Quantidade deve ser maior que 0'),
+    price: z.number().min(0, 'Preço deve ser maior ou igual a 0'),
+    type: z.enum(['USED', 'SOLD']),
+  })).optional(),
   notes: z.string().optional(),
   discount: z.number().min(0, 'Desconto não pode ser negativo').optional(),
 });
@@ -74,6 +83,7 @@ export default function AppointmentModal({
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [professionalServices, setProfessionalServices] = useState<Service[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [subtotal, setSubtotal] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
@@ -91,28 +101,37 @@ export default function AppointmentModal({
     resolver: zodResolver(appointmentSchema),
     defaultValues: {
       services: [],
+      products: [],
       discount: 0,
     }
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields: serviceFields, append: appendService, remove: removeService } = useFieldArray({
     control,
     name: 'services'
   });
 
+  const { fields: productFields, append: appendProduct, remove: removeProduct } = useFieldArray({
+    control,
+    name: 'products'
+  });
+
   const watchedProfessional = watch('professionalId');
   const watchedServices = watch('services');
+  const watchedProducts = watch('products');
   const watchedDiscount = watch('discount') || 0;
 
   const loadInitialData = useCallback(async (): Promise<void> => {
     try {
-      const [professionalsData, customersData] = await Promise.all([
+      const [professionalsData, customersData, productsData] = await Promise.all([
         appointmentService.getProfessionals(user?.companyId),
-        appointmentService.getCustomers(user?.companyId)
+        appointmentService.getCustomers(user?.companyId),
+        appointmentService.getProducts(user?.companyId)
       ]);
 
       setProfessionals(professionalsData);
       setCustomers(customersData);
+      setProducts(productsData);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       setError('Erro ao carregar dados iniciais');
@@ -120,41 +139,46 @@ export default function AppointmentModal({
   }, [user?.companyId]);
 
   const calculateTotals = useCallback((): void => {
-    // Pegar valores atuais diretamente do formulário
     const currentServices = getValues('services');
+    const currentProducts = getValues('products') || [];
     const currentDiscount = getValues('discount') || 0;
     
-    let amount = 0;
+    let servicesAmount = 0;
     let duration = 0;
-
 
     currentServices.forEach(item => {
       const service = professionalServices.find(s => s.id === item.serviceId);
-      
       if (service && item.serviceId > 0 && item.quantity > 0) {
         const servicePrice = Number(service.price);
         const itemTotal = servicePrice * item.quantity;
-        amount += itemTotal;
+        servicesAmount += itemTotal;
         duration += (service.duration || 30) * item.quantity;
       } 
     });
-    setSubtotal(amount);
+
+    let productsAmount = 0;
+    currentProducts.forEach(item => {
+      if (item.productId > 0 && item.quantity > 0 && item.type === 'SOLD') {
+        productsAmount += item.price * item.quantity;
+      }
+    });
+
+    const totalBeforeDiscount = servicesAmount + productsAmount;
+    setSubtotal(totalBeforeDiscount);
     
-    const discountAmount = amount * (currentDiscount / 100);
-    const finalAmount = Math.max(0, amount - discountAmount);
+    const discountAmount = totalBeforeDiscount * (currentDiscount / 100);
+    const finalAmount = Math.max(0, totalBeforeDiscount - discountAmount);
     
     setTotalAmount(finalAmount);
     setTotalDuration(duration);
   }, [professionalServices, getValues]);
 
-  // Carregar dados iniciais
   useEffect(() => {
     if (open) {
       loadInitialData();
     }
   }, [open, loadInitialData]);
 
-  // Preencher dados para edição ou valores selecionados (ANTES de carregar serviços)
   useEffect(() => {
     if (open && appointment) {
       setValue('customerId', appointment.customerId);
@@ -164,12 +188,18 @@ export default function AppointmentModal({
       setValue('notes', appointment.notes || '');
       setValue('discount', appointment.discount || 0);
       
-      // Carregar serviços do profissional primeiro, depois preencher os serviços
       loadProfessionalServices(appointment.professionalId).then(() => {
         setValue('services', appointment.services.map(s => ({
           serviceId: s.serviceId,
           quantity: s.quantity
         })));
+        
+        setValue('products', appointment.products?.map(p => ({
+          productId: p.productId,
+          quantity: p.quantity,
+          price: p.price,
+          type: p.type
+        })) || []);
       });
     } else if (open && !appointment) {
       if (selectedDate) setValue('date', selectedDate);
@@ -178,7 +208,6 @@ export default function AppointmentModal({
     }
   }, [open, appointment, selectedDate, selectedTime, selectedProfessional, setValue]);
 
-  // Carregar serviços do profissional quando selecionado (APENAS para novos agendamentos)
   useEffect(() => {
     if (watchedProfessional && !appointment) {
       loadProfessionalServices(watchedProfessional);
@@ -186,19 +215,17 @@ export default function AppointmentModal({
     }
   }, [watchedProfessional, appointment, setValue]);
 
-  // Calcular total e duração quando serviços, desconto ou lista de serviços do profissional mudarem
   useEffect(() => {
     if (professionalServices.length > 0) {
       calculateTotals();
     }
-  }, [watchedServices, watchedDiscount, professionalServices, calculateTotals]);
+  }, [watchedServices, watchedProducts, watchedDiscount, professionalServices, calculateTotals]);
 
-  // Adicionar primeiro serviço automaticamente (APENAS para novos agendamentos)
   useEffect(() => {
-    if (professionalServices.length > 0 && !appointment && fields.length === 0) {
-      append({ serviceId: professionalServices[0].id, quantity: 1 });
+    if (professionalServices.length > 0 && !appointment && serviceFields.length === 0) {
+      appendService({ serviceId: professionalServices[0].id, quantity: 1 });
     }
-  }, [professionalServices, appointment, fields.length, append]);
+  }, [professionalServices, appointment, serviceFields.length, appendService]);
 
   const loadProfessionalServices = async (professionalId: number): Promise<void> => {
     try {
@@ -236,10 +263,34 @@ export default function AppointmentModal({
     return selectedDateTime < now;
   };
 
+  const checkProductStock = async (productId: number, quantity: number): Promise<boolean> => {
+    try {
+      // Importar productService
+      const productService = (await import('@/services/productService')).default;
+      const stockCheck = await productService.checkStock(productId, quantity);
+      return stockCheck.available;
+    } catch (error) {
+      console.error('Erro ao verificar estoque:', error);
+      return false;
+    }
+  };
+
   const onSubmit = async (data: AppointmentFormData): Promise<void> => {
     try {
       setLoading(true);
       setError('');
+
+      // Validar estoque de produtos
+      if (data.products && data.products.length > 0) {
+        for (const product of data.products) {
+          const hasStock = await checkProductStock(product.productId, product.quantity);
+          if (!hasStock) {
+            const productInfo = products.find(p => p.id === product.productId);
+            setError(`Estoque insuficiente para o produto "${productInfo?.name}"`);
+            return;
+          }
+        }
+      }
 
       const startDateTime = new Date(data.date);
       const [hours, minutes] = data.startTime.split(':').map(Number);
@@ -265,26 +316,28 @@ export default function AppointmentModal({
       }
 
       if (appointment) {
-        const updateData = {
+        const updateData: UpdateAppointmentRequest = {
           startTime: startDateTime.toISOString(),
           endTime: endDateTime.toISOString(),
           services: data.services,
+          products: data.products,
           notes: data.notes,
           discount: data.discount || 0,
         };
-        await appointmentService.updateAppointment(appointment.id, updateData as UpdateAppointmentRequest);
+        await appointmentService.updateAppointment(appointment.id, updateData);
       } else {
-        const createData = {
+        const createData: CreateAppointmentRequest = {
           customerId: data.customerId,
           professionalId: data.professionalId,
           companyId: user?.companyId || 1,
           startTime: startDateTime.toISOString(),
           endTime: endDateTime.toISOString(),
           services: data.services,
+          products: data.products,
           notes: data.notes,
           discount: data.discount || 0,
         };
-        await appointmentService.createAppointment(createData as CreateAppointmentRequest);
+        await appointmentService.createAppointment(createData);
       }
 
       onSuccess();
@@ -303,29 +356,46 @@ export default function AppointmentModal({
     reset();
     setError('');
     setProfessionalServices([]);
+    setProducts([]);
     setSubtotal(0);
     setTotalAmount(0);
     setTotalDuration(0);
     onClose();
   };
 
-  const addService = (): void => {
+  const addServiceItem = (): void => {
     if (watchedProfessional && professionalServices.length > 0) {
-      append({ serviceId: professionalServices[0].id, quantity: 1 });
+      appendService({ serviceId: professionalServices[0].id, quantity: 1 });
     } else {
       setError('Selecione um profissional primeiro');
     }
   };
 
-  const removeService = (index: number): void => {
-    if (fields.length > 1) {
-      remove(index);
+  const addProductItem = (): void => {
+    if (products.length > 0) {
+      const firstProduct = products[0];
+      appendProduct({ 
+        productId: firstProduct.id, 
+        quantity: 1,
+        price: firstProduct.salePrice,
+        type: 'SOLD'
+      });
+    } else {
+      setError('Nenhum produto disponível');
     }
+  };
+
+  const handleProductChange = (index: number, productId: number): void => {
+    const product = products.find(p => p.id === productId);
+    if (product) {
+      setValue(`products.${index}.price`, product.salePrice);
+    }
+    requestAnimationFrame(() => calculateTotals());
   };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl w-[95vw] max-h-[95vh] overflow-y-auto p-4 sm:p-6">
+      <DialogContent className="max-w-5xl w-[95vw] max-h-[95vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader className="space-y-2">
           <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
             <CalendarIcon className="h-5 w-5 shrink-0" />
@@ -345,7 +415,6 @@ export default function AppointmentModal({
 
           <div className="space-y-4">
             <div className="grid grid-cols-1 gap-4">
-              {/* Cliente */}
               <div className="space-y-2">
                 <Label htmlFor="customerId" className="text-sm font-medium">
                   <User className="h-4 w-4 inline mr-2" />
@@ -377,7 +446,6 @@ export default function AppointmentModal({
                 )}
               </div>
 
-              {/* Profissional */}
               <div className="space-y-2">
                 <Label htmlFor="professionalId" className="text-sm font-medium">Profissional *</Label>
                 <Controller
@@ -414,7 +482,6 @@ export default function AppointmentModal({
               </div>
             </div>
 
-            {/* Data e Horário */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Data *</Label>
@@ -484,90 +551,231 @@ export default function AppointmentModal({
 
           <Separator />
 
-          {/* Serviços */}
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <Label className="text-base font-medium">Serviços *</Label>
-              <Button type="button" onClick={addService} size="sm" variant="outline" className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Serviço
-              </Button>
-            </div>
+          {/* Tabs para Serviços e Produtos */}
+          <Tabs defaultValue="services" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="services">
+                <Package className="h-4 w-4 mr-2" />
+                Serviços
+              </TabsTrigger>
+              <TabsTrigger value="products">
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Produtos
+              </TabsTrigger>
+            </TabsList>
 
-            <div className="space-y-3">
-              {fields.map((field, index) => (
-                <div key={field.id} className="p-4 border rounded-lg">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label className="text-sm">Serviço</Label>
-                      <Controller
-                        name={`services.${index}.serviceId`}
-                        control={control}
-                        render={({ field: serviceField }) => (
-                          <Select
-                            value={serviceField.value?.toString()}
-                            onValueChange={(value) => {
-                              serviceField.onChange(parseInt(value));
-                              // Forçar recálculo após a mudança
-                              requestAnimationFrame(() => calculateTotals());
-                            }}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Selecione o serviço" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {professionalServices.map((service) => (
-                                <SelectItem key={service.id} value={service.id.toString()}>
-                                  <div className="flex flex-col items-start min-w-0">
-                                    <span className="truncate font-medium">{service.name}</span>
-                                    <span className="text-xs text-muted-foreground">
-                                      {formatCurrency(service.price)} • {service.duration || 30}min
-                                    </span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
+            {/* Serviços */}
+            <TabsContent value="services" className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <Label className="text-base font-medium">Serviços *</Label>
+                <Button type="button" onClick={addServiceItem} size="sm" variant="outline" className="w-full sm:w-auto">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Serviço
+                </Button>
+              </div>
 
-                    <div className="space-y-2">
-                      <Label className="text-sm">Quantidade</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        className="w-full"
-                        {...register(`services.${index}.quantity`, { 
-                          valueAsNumber: true,
-                          onChange: () => {
-                            requestAnimationFrame(() => calculateTotals());
-                          }
-                        })}
-                      />
-                    </div>
+              <div className="space-y-3">
+                {serviceFields.map((field, index) => (
+                  <div key={field.id} className="p-4 border rounded-lg">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label className="text-sm">Serviço</Label>
+                        <Controller
+                          name={`services.${index}.serviceId`}
+                          control={control}
+                          render={({ field: serviceField }) => (
+                            <Select
+                              value={serviceField.value?.toString()}
+                              onValueChange={(value) => {
+                                serviceField.onChange(parseInt(value));
+                                requestAnimationFrame(() => calculateTotals());
+                              }}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Selecione o serviço" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {professionalServices.map((service) => (
+                                  <SelectItem key={service.id} value={service.id.toString()}>
+                                    <div className="flex flex-col items-start min-w-0">
+                                      <span className="truncate font-medium">{service.name}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {formatCurrency(service.price)} • {service.duration || 30}min
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
 
-                    <div className="flex items-end">
-                      {fields.length > 1 && (
-                        <Button
-                          type="button"
-                          onClick={() => removeService(index)}
-                          size="sm"
-                          variant="outline"
+                      <div className="space-y-2">
+                        <Label className="text-sm">Quantidade</Label>
+                        <Input
+                          type="number"
+                          min="1"
                           className="w-full"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Remover
-                        </Button>
-                      )}
+                          {...register(`services.${index}.quantity`, { 
+                            valueAsNumber: true,
+                            onChange: () => {
+                              requestAnimationFrame(() => calculateTotals());
+                            }
+                          })}
+                        />
+                      </div>
+
+                      <div className="flex items-end">
+                        {serviceFields.length > 1 && (
+                          <Button
+                            type="button"
+                            onClick={() => removeService(index)}
+                            size="sm"
+                            variant="outline"
+                            className="w-full"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            {errors.services && <p className="text-xs text-destructive">{errors.services.message}</p>}
-          </div>
+              {errors.services && <p className="text-xs text-destructive">{errors.services.message}</p>}
+            </TabsContent>
+
+            {/* Produtos */}
+            <TabsContent value="products" className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <Label className="text-base font-medium">Produtos (Opcional)</Label>
+                <Button type="button" onClick={addProductItem} size="sm" variant="outline" className="w-full sm:w-auto">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Produto
+                </Button>
+              </div>
+
+              {productFields.length === 0 && (
+                <div className="p-8 text-center text-muted-foreground border rounded-lg border-dashed">
+                  <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>Nenhum produto adicionado</p>
+                  <p className="text-sm mt-1">Clique em "Adicionar Produto" para incluir produtos utilizados ou vendidos</p>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {productFields.map((field, index) => {
+                  const selectedProduct = products.find(p => p.id === watch(`products.${index}.productId`));
+                  
+                  return (
+                    <div key={field.id} className="p-4 border rounded-lg">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label className="text-sm">Produto</Label>
+                          <Controller
+                            name={`products.${index}.productId`}
+                            control={control}
+                            render={({ field: productField }) => (
+                              <Select
+                                value={productField.value?.toString()}
+                                onValueChange={(value) => {
+                                  productField.onChange(parseInt(value));
+                                  handleProductChange(index, parseInt(value));
+                                }}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Selecione o produto" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {products.map((product) => (
+                                    <SelectItem key={product.id} value={product.id.toString()}>
+                                      <div className="flex flex-col items-start min-w-0">
+                                        <span className="truncate font-medium">{product.name}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                          {formatCurrency(product.salePrice)} • Estoque: {product.stock} {product.unit}
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                          {selectedProduct && selectedProduct.stock === 0 && (
+                            <p className="text-xs text-destructive">Produto sem estoque!</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm">Tipo</Label>
+                          <Controller
+                            name={`products.${index}.type`}
+                            control={control}
+                            render={({ field: typeField }) => (
+                              <Select
+                                value={typeField.value}
+                                onValueChange={(value) => {
+                                  typeField.onChange(value);
+                                  requestAnimationFrame(() => calculateTotals());
+                                }}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="USED">Usado</SelectItem>
+                                  <SelectItem value="SOLD">Vendido</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm">Quantidade</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max={selectedProduct?.stock || 999}
+                            className="w-full"
+                            {...register(`products.${index}.quantity`, { 
+                              valueAsNumber: true,
+                              onChange: () => {
+                                requestAnimationFrame(() => calculateTotals());
+                              }
+                            })}
+                          />
+                        </div>
+
+                        <div className="flex items-end">
+                          <Button
+                            type="button"
+                            onClick={() => removeProduct(index)}
+                            size="sm"
+                            variant="outline"
+                            className="w-full"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Info sobre o tipo */}
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        {watch(`products.${index}.type`) === 'USED' ? (
+                          <span>• Produto usado no serviço (não soma no total)</span>
+                        ) : (
+                          <span>• Produto vendido ao cliente (soma no total)</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </TabsContent>
+          </Tabs>
 
           <Separator />
 

@@ -19,7 +19,9 @@ import {
   XCircle,
   Play,
   Square,
-  UserCheck
+  UserCheck,
+  ShoppingCart,
+  Package
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -292,7 +294,10 @@ export default function AppointmentDetailsModal({
 
             {/* Serviços */}
             <div className="space-y-3">
-              <h3 className="font-semibold">Serviços</h3>
+              <h3 className="font-semibold flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Serviços
+              </h3>
               <div className="space-y-3">
                 {appointment.services.map((appointmentService, index) => (
                   <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
@@ -314,6 +319,53 @@ export default function AppointmentDetailsModal({
                 ))}
               </div>
             </div>
+
+            {/* Produtos */}
+            {appointment.products && appointment.products.length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <ShoppingCart className="h-4 w-4" />
+                    Produtos
+                  </h3>
+                  <div className="space-y-3">
+                    {appointment.products.map((appointmentProduct, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{appointmentProduct.product.name}</p>
+                            <Badge variant={appointmentProduct.type === 'SOLD' ? 'default' : 'secondary'} className="text-xs">
+                              {appointmentProduct.type === 'SOLD' ? 'Vendido' : 'Usado'}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Quantidade: {appointmentProduct.quantity} {appointmentProduct.product.unit}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          {appointmentProduct.type === 'SOLD' && (
+                            <>
+                              <p className="font-medium">{formatCurrency(appointmentProduct.price * appointmentProduct.quantity)}</p>
+                              {appointmentProduct.quantity > 1 && (
+                                <p className="text-sm text-muted-foreground">
+                                  {formatCurrency(appointmentProduct.price)} cada
+                                </p>
+                              )}
+                            </>
+                          )}
+                          {appointmentProduct.type === 'USED' && (
+                            <p className="text-sm text-muted-foreground">
+                              Não cobrado
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
             <Separator />
 

@@ -114,11 +114,23 @@ class ProductService {
     return apiService.get<Product[]>(finalUrl);
   }
 
-  // Atualização de estoque simples baseada no controller
   async updateStock(id: number, stock: number) {
     return apiService.patch<Product>(`${this.baseUrl}/${id}/stock`, {
       stock,
     });
+  }
+
+  // Novo método para verificar estoque
+  async checkStock(
+    id: number,
+    quantity: number
+  ): Promise<{ available: boolean; currentStock: number; requested: number }> {
+    const response = await apiService.get<{
+      available: boolean;
+      currentStock: number;
+      requested: number;
+    }>(`${this.baseUrl}/${id}/check-stock?quantity=${quantity}`);
+    return response.data;
   }
 }
 

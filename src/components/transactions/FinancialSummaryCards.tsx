@@ -48,7 +48,7 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
   const balance = safeNumber(summary.summary?.balance);
   const pendingPayments = safeNumber(summary.summary?.pendingTotal);
   const paidTransactions = safeNumber(summary.summary.paidTransactions);
-  //const totalTransactions = safeNumber(summary.totalTransactions); 
+  const totalTransactions = safeNumber(summary.summary.totalTransactions);
 
 
   return (
@@ -146,7 +146,7 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
             {paidTransactions}
           </div>
           <p className="text-xs text-muted-foreground">
-            {paidTransactions > 0 ? `de ${paidTransactions} totais` : 'Nenhuma transação'} {/* Texto ajustado */}
+            {paidTransactions > 0 ? `de ${totalTransactions} totais` : 'Nenhuma transação'} {/* Texto ajustado */}
           </p>
         </CardContent>
       </Card>

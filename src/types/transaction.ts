@@ -131,6 +131,7 @@ export interface FinancialSummary {
     pendingTotal: number;
     overdueTotal: number;
     paidTransactions: number;
+    totalTransactions : number;
   };
   categoryBreakdown: Array<{
     category: string;

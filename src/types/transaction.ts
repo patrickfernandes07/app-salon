@@ -113,7 +113,7 @@ export interface TransactionFilters {
   endDate?: string;
 }
 
-export interface FinancialSummary {
+/* export interface FinancialSummary {
   totalIncome: number;
   totalExpense: number;
   balance: number;
@@ -121,7 +121,7 @@ export interface FinancialSummary {
   overduePayments: number;
   paidTransactions: number;
   totalTransactions: number;
-}
+} */
 
 export interface FinancialSummary {
   summary: {
@@ -130,6 +130,7 @@ export interface FinancialSummary {
     balance: number;
     pendingTotal: number;
     overdueTotal: number;
+    paidTransactions: number;
   };
   categoryBreakdown: Array<{
     category: string;

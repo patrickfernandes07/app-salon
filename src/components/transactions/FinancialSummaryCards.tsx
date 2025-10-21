@@ -3,26 +3,21 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { TrendingUp, TrendingDown, DollarSign, Clock, AlertTriangle, CheckCircle } from "lucide-react"
+import { TrendingUp, TrendingDown, DollarSign, Clock, CheckCircle } from "lucide-react"
 import { FinancialSummary } from "@/types/transaction"
+import { formatCurrency } from "@/lib/utils/currency"
+import { safeNumber } from "@/lib/utils/type-guards"
 
 interface FinancialSummaryCardsProps {
   summary: FinancialSummary | null
   loading?: boolean
 }
 
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value)
-}
-
 export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCardsProps) {
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {Array.from({ length: 6 }).map((_, i) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4"> {/* Ajustado para 5 colunas */}
+        {Array.from({ length: 5 }).map((_, i) => ( // Ajustado para 5 skeletons
           <Card key={i}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
@@ -48,17 +43,16 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
     )
   }
 
-  // Extrai os valores corretos da estrutura
-  const totalIncome = summary.totalIncome ?? 0
-  const totalExpense = summary.totalExpense ?? 0
-  const balance = summary.balance ?? 0
-  const pendingPayments = summary.pendingPayments ?? 0
-  const overduePayments = summary.overduePayments ?? 0
-  const paidTransactions = summary.paidTransactions ?? 0
-  const totalTransactions = summary.totalTransactions ?? 0
+  const totalIncome = safeNumber(summary.summary?.totalIncome);
+  const totalExpense = safeNumber(summary.summary?.totalExpense);
+  const balance = safeNumber(summary.summary?.balance);
+  const pendingPayments = safeNumber(summary.summary?.pendingTotal);
+  const paidTransactions = safeNumber(summary.summary.paidTransactions);
+  //const totalTransactions = safeNumber(summary.totalTransactions); 
+
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4"> {/* Ajustado para 5 colunas */}
       {/* Receitas */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -67,7 +61,7 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-green-600">
-            {formatCurrency(totalIncome)}
+            {formatCurrency(totalIncome)} {/* Usa a função importada */}
           </div>
           <p className="text-xs text-muted-foreground">
             Total de entradas
@@ -83,7 +77,7 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-red-600">
-            {formatCurrency(totalExpense)}
+            {formatCurrency(totalExpense)} {/* Usa a função importada */}
           </div>
           <p className="text-xs text-muted-foreground">
             Total de saídas
@@ -99,7 +93,7 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
         </CardHeader>
         <CardContent>
           <div className={`text-2xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {formatCurrency(balance)}
+            {formatCurrency(balance)} {/* Usa a função importada */}
           </div>
           <p className="text-xs text-muted-foreground">
             Receitas - Despesas
@@ -115,15 +109,16 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-yellow-600">
-            {formatCurrency(pendingPayments)}
+            {formatCurrency(pendingPayments)} {/* Usa a função importada */}
           </div>
           <p className="text-xs text-muted-foreground">
-            Aguardando pagamento
+            Aguardando pagamento/recebimento
           </p>
         </CardContent>
       </Card>
 
-      {/* Vencidas */}
+      {/* Vencidas - REMOVIDO */}
+      {/*
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Vencidas</CardTitle>
@@ -131,18 +126,19 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-red-600">
-            {formatCurrency(overduePayments)}
+            {formatCurrency(overduePayments)} // Usa a função importada
           </div>
           <p className="text-xs text-muted-foreground">
-            Pagamentos em atraso
+            Pagamentos/Recebimentos em atraso
           </p>
         </CardContent>
       </Card>
+      */}
 
       {/* Pagas */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Transações</CardTitle>
+          <CardTitle className="text-sm font-medium">Transações Pagas</CardTitle> {/* Título ajustado */}
           <CheckCircle className="h-4 w-4 text-green-600" />
         </CardHeader>
         <CardContent>
@@ -150,7 +146,7 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
             {paidTransactions}
           </div>
           <p className="text-xs text-muted-foreground">
-            {totalTransactions > 0 ? `de ${totalTransactions} pagas` : 'Nenhuma transação'}
+            {paidTransactions > 0 ? `de ${paidTransactions} totais` : 'Nenhuma transação'} {/* Texto ajustado */}
           </p>
         </CardContent>
       </Card>

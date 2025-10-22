@@ -46,17 +46,10 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
   const totalIncome = safeNumber(summary.summary?.totalIncome);
   const totalExpense = safeNumber(summary.summary?.totalExpense);
   const balance = safeNumber(summary.summary?.balance);
-<<<<<<< HEAD
-  const pendingPayments = safeNumber(summary.summary?.pendingTotal);
-  const paidTransactions = safeNumber(summary.summary.paidTransactions);
-  console.log(summary);
-  //const totalTransactions = safeNumber(summary.totalTransactions); 
-=======
   const pendingIncomePayments = safeNumber(summary.summary?.pendingIncomePayments);
   const pendingExpensePayments = safeNumber(summary.summary?.pendingExpensePayments);
 /*   const paidTransactions = safeNumber(summary.summary.paidTransactions);
   const totalTransactions = safeNumber(summary.summary.totalTransactions); */
->>>>>>> e0c44f5a6b9e1bbd9003f422e5636f74af1e6c5a
 
 
   return (

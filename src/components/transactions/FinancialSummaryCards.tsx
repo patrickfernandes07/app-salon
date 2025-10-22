@@ -48,8 +48,8 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
   const balance = safeNumber(summary.summary?.balance);
   const pendingIncomePayments = safeNumber(summary.summary?.pendingIncomePayments);
   const pendingExpensePayments = safeNumber(summary.summary?.pendingExpensePayments);
-/*   const paidTransactions = safeNumber(summary.summary.paidTransactions);
-  const totalTransactions = safeNumber(summary.summary.totalTransactions); */
+// /*   const paidTransactions = safeNumber(summary.summary.paidTransactions);
+//   const totalTransactions = safeNumber(summary.summary.totalTransactions); */
 
 
   return (

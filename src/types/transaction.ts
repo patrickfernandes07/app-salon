@@ -118,9 +118,11 @@ export interface FinancialSummary {
     totalIncome: number;
     totalExpense: number;
     balance: number;
-    pendingTotal: number;
+    pendingIncomePayments: number;  
+    pendingExpensePayments: number;  
     overdueTotal: number;
     paidTransactions: number;
+    totalTransactions : number;
   };
   categoryBreakdown: Array<{
     category: string;

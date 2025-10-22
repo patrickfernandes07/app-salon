@@ -1,9 +1,9 @@
-// src/components/settings/CompanyLogoUpload.tsx
+
 "use client"
 
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Upload, Building2 } from "lucide-react"
+import { Upload, Building2, Loader2 } from "lucide-react"
 import { Company } from "@/types/company"
 
 interface CompanyLogoUploadProps {
@@ -24,30 +24,31 @@ export function CompanyLogoUpload({
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validar tipo de arquivo
+    
     if (!file.type.startsWith('image/')) {
       alert('Por favor, selecione apenas arquivos de imagem')
       return
     }
 
-    // Validar tamanho (máximo 2MB)
+    
     if (file.size > 2 * 1024 * 1024) {
       alert('A imagem deve ter no máximo 2MB')
       return
     }
 
-    // Criar preview
+    
     const reader = new FileReader()
     reader.onloadend = () => {
       setPreview(reader.result as string)
     }
     reader.readAsDataURL(file)
 
-    // Upload
+    
     try {
       await onUpload(file)
+      
     } catch (error) {
-      // Reverter preview em caso de erro
+      
       setPreview(company.logo || null)
     }
   }
@@ -58,15 +59,13 @@ export function CompanyLogoUpload({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-medium">Logo da Empresa</h3>
-        <p className="text-sm text-muted-foreground">
-          Tamanho recomendado: 400x400px. Máximo: 2MB
-        </p>
-      </div>
-
       <div className="flex items-center gap-6">
         <div className="relative h-32 w-32 rounded-lg border-2 border-dashed border-muted-foreground/25 overflow-hidden bg-muted/50">
+          {isUploading && (
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          )}
           {preview ? (
             <img
               src={preview}
@@ -87,11 +86,23 @@ export function CompanyLogoUpload({
             onClick={handleClick}
             disabled={isUploading}
           >
-            <Upload className="mr-2 h-4 w-4" />
-            {isUploading ? "Enviando..." : "Alterar Logo"}
+            {isUploading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Enviando...
+              </>
+            ) : (
+              <>
+                <Upload className="mr-2 h-4 w-4" />
+                Alterar Logo
+              </>
+            )}
           </Button>
           <p className="text-xs text-muted-foreground">
-            JPG, PNG ou GIF
+            JPG, PNG ou GIF • Máximo 2MB
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Tamanho recomendado: 400x400px
           </p>
         </div>
 
@@ -101,6 +112,7 @@ export function CompanyLogoUpload({
           accept="image/*"
           onChange={handleFileChange}
           className="hidden"
+          disabled={isUploading}
         />
       </div>
     </div>

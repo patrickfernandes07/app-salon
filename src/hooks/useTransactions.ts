@@ -38,6 +38,7 @@ export const useTransactions = () => {
   const fetchFinancialSummary = async () => {
     try {
       const response = await transactionService.getFinancialSummary(1); // provisorio
+      console.log(response);
       setFinancialSummary(response.data);
     } catch (error) {
       console.error("Erro ao buscar resumo financeiro:", error);

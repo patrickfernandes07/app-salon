@@ -1,4 +1,3 @@
-// src/services/companyService.ts
 import { apiService } from "./api";
 import { Company, UpdateCompanyData } from "@/types/company";
 
@@ -13,16 +12,19 @@ class CompanyService {
     return apiService.patch<Company>(`${this.baseUrl}/${id}`, data);
   }
 
-  async uploadLogo(id: number, file: File) {
+  async uploadLogo(file: File) {
     const formData = new FormData();
     formData.append("logo", file);
 
-    // Você precisará ajustar isso se tiver um endpoint específico para upload
-    return apiService.patch<Company>(`${this.baseUrl}/${id}/logo`, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    return apiService.post<{ message: string; url: string }>(
+      `${this.baseUrl}/upload-logo`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
   }
 }
 

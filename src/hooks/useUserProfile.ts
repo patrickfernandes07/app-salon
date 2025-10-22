@@ -1,4 +1,3 @@
-// src/hooks/useUserProfile.ts
 "use client";
 
 import { useState, useEffect } from "react";
@@ -60,8 +59,7 @@ export const useUserProfile = () => {
 
     try {
       setSubmitting(true);
-      // Você precisará implementar este endpoint no backend
-      // await userService.changePassword(user.id, { currentPassword, newPassword });
+
       toast({
         title: "Sucesso",
         description: "Senha alterada com sucesso",
@@ -83,13 +81,19 @@ export const useUserProfile = () => {
 
     try {
       setSubmitting(true);
-      // Você precisará implementar este endpoint no backend
-      // const response = await userService.uploadAvatar(user.id, file);
-      // setUser(response.data);
+
+      const response = await userService.uploadAvatar(file);
+
+      setUser({
+        ...user,
+        avatar: response.data.url,
+      });
+
       toast({
         title: "Sucesso",
         description: "Foto de perfil atualizada com sucesso",
       });
+      return response.data;
     } catch (error) {
       toast({
         title: "Erro",

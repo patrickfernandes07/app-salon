@@ -53,8 +53,17 @@ export const useCompanySettings = (companyId: number) => {
   const uploadLogo = async (file: File) => {
     try {
       setSubmitting(true);
-      const response = await companyService.uploadLogo(companyId, file);
-      setCompany(response.data);
+      // A rota do backend não precisa do companyId na URL, usa o token JWT
+      const response = await companyService.uploadLogo(file);
+
+      // Atualiza o estado local com a nova URL da logo
+      if (company) {
+        setCompany({
+          ...company,
+          logo: response.data.url,
+        });
+      }
+
       toast({
         title: "Sucesso",
         description: "Logo atualizada com sucesso",

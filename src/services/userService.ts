@@ -1,4 +1,3 @@
-// src/services/userService.ts
 import { apiService } from "./api";
 import { User, CreateUserData, UpdateUserData } from "@/types/user";
 
@@ -8,7 +7,7 @@ class UserService {
   async getUsers(companyId: number) {
     const params = new URLSearchParams();
     if (!companyId) {
-      companyId = 1; // provisorio
+      companyId = 1;
     }
     params.append("companyId", companyId.toString());
 
@@ -42,6 +41,21 @@ class UserService {
 
   async deactivateUser(id: number) {
     return apiService.patch<User>(`${this.baseUrl}/${id}/deactivate`);
+  }
+
+  async uploadAvatar(file: File) {
+    const formData = new FormData();
+    formData.append("avatar", file);
+
+    return apiService.post<{ message: string; url: string }>(
+      `${this.baseUrl}/avatar`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
   }
 }
 

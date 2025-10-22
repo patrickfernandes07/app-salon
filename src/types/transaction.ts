@@ -113,16 +113,6 @@ export interface TransactionFilters {
   endDate?: string;
 }
 
-/* export interface FinancialSummary {
-  totalIncome: number;
-  totalExpense: number;
-  balance: number;
-  pendingPayments: number;
-  overduePayments: number;
-  paidTransactions: number;
-  totalTransactions: number;
-} */
-
 export interface FinancialSummary {
   summary: {
     totalIncome: number;

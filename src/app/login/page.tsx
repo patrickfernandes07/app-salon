@@ -109,7 +109,7 @@ export default function LoginPage() {
           </div>
           <div className="space-y-2">
             <CardTitle className="text-2xl font-bold">
-              Barbershop Manager
+              SalonTime
             </CardTitle>
             <CardDescription>
               Entre com suas credenciais para acessar o sistema

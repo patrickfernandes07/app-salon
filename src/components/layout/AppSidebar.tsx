@@ -2,6 +2,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { ChevronUp, LogOut } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -61,14 +62,19 @@ export function AppSidebar() {
     return roles[role as keyof typeof roles] || role;
   };
 
-  const LogoIcon = brandConfig.logo.icon;
-
   return (
     <Sidebar>
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2">
-          <div className="bg-primary rounded-lg p-2">
-            <LogoIcon className="h-6 w-6 text-primary-foreground" />
+          <div className="flex items-center justify-center">
+            <Image 
+              src="/logo.png" 
+              alt={brandConfig.logo.title}
+              width={35}
+              height={35}
+              className="object-contain"
+              priority
+            />
           </div>
           <div>
             <h1 className="text-lg font-bold text-sidebar-foreground">

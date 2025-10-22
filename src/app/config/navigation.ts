@@ -140,11 +140,11 @@ export const userActions: UserAction[] = [
 
 // Configurações da logo/brand
 export const brandConfig = {
-  name: "Barbershop Manager",
+  name: "SalonTime",
   shortName: "BSM",
   logo: {
     icon: Scissors,
-    title: "Barbershop",
-    subtitle: "Manager",
+    title: "SalonTime",
+    subtitle: "Gestão de agendamentos",
   },
 };

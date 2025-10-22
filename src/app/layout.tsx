@@ -8,7 +8,7 @@ import { AuthProvider } from '@/contexts/auth.context'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Barbershop Manager',
+  title: 'SalonTime',
   description: 'Sistema de gestão para barbearias',
 }
 

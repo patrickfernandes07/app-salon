@@ -101,12 +101,12 @@ export const navigation: NavigationGroup[] = [
         href: "/settings",
         icon: Settings,
       },
-      {
-        id: "users",
-        name: "Usuários",
-        href: "/users",
-        icon: Shield,
-      },
+      // {
+      //   id: "users",
+      //   name: "Usuários",
+      //   href: "/users",
+      //   icon: Shield,
+      // },
       // {
       //   id: "logs",
       //   name: "Logs do Sistema",

@@ -46,9 +46,10 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
   const totalIncome = safeNumber(summary.summary?.totalIncome);
   const totalExpense = safeNumber(summary.summary?.totalExpense);
   const balance = safeNumber(summary.summary?.balance);
-  const pendingPayments = safeNumber(summary.summary?.pendingTotal);
-  const paidTransactions = safeNumber(summary.summary.paidTransactions);
-  const totalTransactions = safeNumber(summary.summary.totalTransactions);
+  const pendingIncomePayments = safeNumber(summary.summary?.pendingIncomePayments);
+  const pendingExpensePayments = safeNumber(summary.summary?.pendingExpensePayments);
+/*   const paidTransactions = safeNumber(summary.summary.paidTransactions);
+  const totalTransactions = safeNumber(summary.summary.totalTransactions); */
 
 
   return (
@@ -101,18 +102,34 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
         </CardContent>
       </Card>
 
-      {/* Pendentes */}
+      {/* Receita Pendente */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
+          <CardTitle className="text-sm font-medium">Receita Pendente</CardTitle>
           <Clock className="h-4 w-4 text-yellow-600" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-yellow-600">
-            {formatCurrency(pendingPayments)} {/* Usa a função importada */}
+            {formatCurrency(pendingIncomePayments)} {/* Usa a função importada */}
           </div>
           <p className="text-xs text-muted-foreground">
-            Aguardando pagamento/recebimento
+            Aguardando recebimento
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Despesa Pendente */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Despesa Pendente</CardTitle>
+          <Clock className="h-4 w-4 text-yellow-600" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-yellow-600">
+            {formatCurrency(pendingExpensePayments)} {/* Usa a função importada */}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Aguardando pagamento
           </p>
         </CardContent>
       </Card>
@@ -136,9 +153,9 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
       */}
 
       {/* Pagas */}
-      <Card>
+      {/* <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Transações Pagas</CardTitle> {/* Título ajustado */}
+          <CardTitle className="text-sm font-medium">Transações Pagas</CardTitle>
           <CheckCircle className="h-4 w-4 text-green-600" />
         </CardHeader>
         <CardContent>
@@ -146,10 +163,10 @@ export function FinancialSummaryCards({ summary, loading }: FinancialSummaryCard
             {paidTransactions}
           </div>
           <p className="text-xs text-muted-foreground">
-            {paidTransactions > 0 ? `de ${totalTransactions} totais` : 'Nenhuma transação'} {/* Texto ajustado */}
+            {paidTransactions > 0 ? `de ${totalTransactions} totais` : 'Nenhuma transação'}
           </p>
         </CardContent>
-      </Card>
+      </Card> */}
     </div>
   )
 }

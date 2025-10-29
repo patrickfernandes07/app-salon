@@ -11,10 +11,25 @@ import {
   FinancialSummary,
 } from "@/types/transaction";
 
+interface SearchTransactionDto {
+  companyId?: number;
+  professionalId?: number;
+  appointmentId?: number;
+  type?: TransactionType;
+  category?: TransactionCategory;
+  paymentMethod?: PaymentMethod;
+  status?: TransactionStatus;
+  startDate?: string;
+  endDate?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  description?: string;
+}
+
 class TransactionService {
   private readonly baseUrl = "/transactions";
 
-async getTransactions(
+  async getTransactions(
     companyId?: number,
     startDate?: string,
     endDate?: string
@@ -173,11 +188,12 @@ async getTransactions(
     return apiService.get<TransactionStatus[]>(`${this.baseUrl}/statuses`);
   }
 
-  async searchTransactions(searchDto: any) {
+  async searchTransactions(searchDto: SearchTransactionDto) {
     const params = new URLSearchParams();
     Object.keys(searchDto).forEach((key) => {
-      if (searchDto[key] !== undefined && searchDto[key] !== null) {
-        params.append(key, searchDto[key].toString());
+      const value = searchDto[key as keyof SearchTransactionDto];
+      if (value !== undefined && value !== null) {
+        params.append(key, value.toString());
       }
     });
 

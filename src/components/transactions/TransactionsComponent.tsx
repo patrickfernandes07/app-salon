@@ -1,8 +1,7 @@
-// src/components/transactions/TransactionsComponent.tsx
 "use client"
 
 import { useState } from "react"
-import { Plus } from "lucide-react"
+import { Plus, Loader2 } from "lucide-react"
 import { DataTable } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
 import {
@@ -20,7 +19,6 @@ import { createColumns } from "./columns"
 import { Transaction, CreateTransactionData, UpdateTransactionData } from "@/types/transaction"
 import { useTransactions } from "@/hooks/useTransactions"
 import { DateRangePicker } from "@/components/ui/DateRangePicker"
-import { DateRange } from "react-day-picker"
 
 export function TransactionsComponent() {
   const {
@@ -36,15 +34,16 @@ export function TransactionsComponent() {
     dateRange,
     handleDateChange,
     applyDateFilter,
+    tableKey,
   } = useTransactions()
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null)
 
-  const handleCreate = async (data: CreateTransactionData) => {
+  const handleCreate = async (data: CreateTransactionData | UpdateTransactionData) => {
     try {
-      await createTransaction(data)
+      await createTransaction(data as CreateTransactionData)
       setIsCreateDialogOpen(false)
     } catch (error) {
       console.error(error);
@@ -55,11 +54,11 @@ export function TransactionsComponent() {
     setEditingTransaction(transaction)
   }
 
-  const handleUpdate = async (data: UpdateTransactionData) => {
+  const handleUpdate = async (data: CreateTransactionData | UpdateTransactionData) => {
     if (!editingTransaction) return
 
     try {
-      await updateTransaction(editingTransaction.id, data)
+      await updateTransaction(editingTransaction.id, data as UpdateTransactionData)
       setEditingTransaction(null)
     } catch (error) {
       console.error(error);
@@ -99,7 +98,7 @@ export function TransactionsComponent() {
 
   const columns = createColumns(handleEdit, handleDelete, handleMarkAsPaid, handleCancel)
 
-  if (loading) {
+  if (loading && transactions.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -112,7 +111,7 @@ export function TransactionsComponent() {
 
   return (
     <div className="space-y-6">
-<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Transações</h1>
           <p className="text-muted-foreground">
@@ -129,7 +128,8 @@ export function TransactionsComponent() {
 
       <div className="flex items-center gap-2">
         <DateRangePicker date={dateRange} onDateChange={handleDateChange} />
-        <Button onClick={applyDateFilter}>
+        <Button onClick={applyDateFilter} disabled={loading}>
+          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Filtrar
         </Button>
       </div>
@@ -140,6 +140,7 @@ export function TransactionsComponent() {
       {/* Tabela de Transações */}
       <div className="space-y-4">
         <DataTable
+          key={tableKey}
           columns={columns}
           data={transactions}
           searchKey="description"

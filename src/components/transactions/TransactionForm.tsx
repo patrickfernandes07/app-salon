@@ -36,17 +36,11 @@ import {
 } from "@/types/transaction"
 
 const transactionSchema = z.object({
-  type: z.nativeEnum(TransactionType, {
-    errorMap: () => ({ message: "Selecione um tipo válido" })
-  }),
-  category: z.nativeEnum(TransactionCategory, {
-    errorMap: () => ({ message: "Selecione uma categoria válida" })
-  }),
+  type: z.nativeEnum(TransactionType),
+  category: z.nativeEnum(TransactionCategory),
   amount: z.number().min(0.01, "Valor deve ser maior que zero"),
   description: z.string().min(2, "Descrição deve ter pelo menos 2 caracteres"),
-  paymentMethod: z.nativeEnum(PaymentMethod, {
-    errorMap: () => ({ message: "Selecione um método de pagamento válido" })
-  }),
+  paymentMethod: z.nativeEnum(PaymentMethod),
   installments: z.number().min(1, "Número de parcelas deve ser pelo menos 1").optional(),
   dueDate: z.string().optional(),
   professionalId: z.number().optional(),

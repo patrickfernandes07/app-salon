@@ -1,4 +1,3 @@
-// src/hooks/useTransactions.ts
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -45,69 +44,73 @@ export const useTransactions = () => {
   const [submitting, setSubmitting] = useState(false);
   const [financialSummary, setFinancialSummary] =
     useState<FinancialSummary | null>(null);
-
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
+  const [tableKey, setTableKey] = useState(0);
 
-  const fetchFinancialSummary = useCallback(async (
-    startDate: string,
-    endDate: string
-  ) => {
-    if (!companyId) return;
-    try {
-      const response = await transactionService.getFinancialSummary(
-        companyId,
-        startDate,
-        endDate
-      );
-      setFinancialSummary(response.data);
-    } catch (error) {
-      console.error("Erro ao buscar resumo financeiro:", error);
-    }
-  }, [companyId]);
+  const fetchTransactions = useCallback(
+    async (startDate: string, endDate: string) => {
+      if (!companyId) return;
 
-  const fetchTransactions = useCallback(async (
-    startDate: string,
-    endDate: string
-  ) => {
-    if (!companyId) return;
-    try {
-      setLoading(true);
-      const response = await transactionService.getTransactions(
-        companyId,
-        startDate,
-        endDate
-      );
-      setTransactions(response.data);
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar transações",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [companyId]);
+      try {
+        setLoading(true);
+        const response = await transactionService.getTransactions(
+          companyId,
+          startDate,
+          endDate
+        );
 
-  const applyDateFilter = useCallback(() => {
+        setTransactions(response.data);
+        setTableKey((prev) => prev + 1);
+      } catch (error) {
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar transações",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [companyId]
+  );
+
+  const fetchFinancialSummary = useCallback(
+    async (startDate: string, endDate: string) => {
+      if (!companyId) return;
+
+      try {
+        const response = await transactionService.getFinancialSummary(
+          companyId,
+          startDate,
+          endDate
+        );
+        setFinancialSummary(response.data);
+      } catch (error) {
+        console.error("Erro ao buscar resumo financeiro:", error);
+      }
+    },
+    [companyId]
+  );
+
+  const applyDateFilter = useCallback(async () => {
     const { startDate, endDate } = getSafeDateRange(dateRange);
 
-    fetchTransactions(startDate, endDate);
-    fetchFinancialSummary(startDate, endDate);
+    await Promise.all([
+      fetchTransactions(startDate, endDate),
+      fetchFinancialSummary(startDate, endDate),
+    ]);
   }, [dateRange, fetchTransactions, fetchFinancialSummary]);
 
   useEffect(() => {
     if (companyId) {
-      applyDateFilter();
+      const { startDate, endDate } = getSafeDateRange(dateRange);
+      fetchTransactions(startDate, endDate);
+      fetchFinancialSummary(startDate, endDate);
     }
   }, [companyId]);
-
-  const refetchData = useCallback(() => {
-    applyDateFilter();
-  }, [applyDateFilter]);
 
   const createTransaction = useCallback(
     async (data: CreateTransactionData) => {
@@ -117,15 +120,19 @@ export const useTransactions = () => {
         setSubmitting(true);
         await transactionService.createTransaction(dataWithCompany);
         toast({ title: "Sucesso", description: "Transação criada" });
-        refetchData();
+        await applyDateFilter();
       } catch (error) {
-        toast({ title: "Erro", description: "Erro ao criar", variant: "destructive" });
+        toast({
+          title: "Erro",
+          description: "Erro ao criar",
+          variant: "destructive",
+        });
         throw error;
       } finally {
         setSubmitting(false);
       }
     },
-    [companyId, refetchData]
+    [companyId, applyDateFilter]
   );
 
   const updateTransaction = useCallback(
@@ -134,15 +141,19 @@ export const useTransactions = () => {
         setSubmitting(true);
         await transactionService.updateTransaction(id, data);
         toast({ title: "Sucesso", description: "Transação atualizada" });
-        refetchData();
+        await applyDateFilter();
       } catch (error) {
-        toast({ title: "Erro", description: "Erro ao atualizar", variant: "destructive" });
+        toast({
+          title: "Erro",
+          description: "Erro ao atualizar",
+          variant: "destructive",
+        });
         throw error;
       } finally {
         setSubmitting(false);
       }
     },
-    [refetchData]
+    [applyDateFilter]
   );
 
   const deleteTransaction = useCallback(
@@ -151,42 +162,60 @@ export const useTransactions = () => {
         setSubmitting(true);
         await transactionService.deleteTransaction(id);
         toast({ title: "Sucesso", description: "Transação excluída" });
-        refetchData();
+        await applyDateFilter();
       } catch (error) {
-        toast({ title: "Erro", description: "Erro ao excluir", variant: "destructive" });
+        toast({
+          title: "Erro",
+          description: "Erro ao excluir",
+          variant: "destructive",
+        });
         throw error;
       } finally {
         setSubmitting(false);
       }
     },
-    [refetchData]
+    [applyDateFilter]
   );
-  
-  const markAsPaid = useCallback(async (transaction: Transaction) => {
-     try {
-       setSubmitting(true);
-       await transactionService.markAsPaid(transaction.id);
-       toast({ title: "Sucesso", description: "Transação marcada como paga" });
-       refetchData();
-     } catch (error) {
-       toast({ title: "Erro", description: "Erro ao marcar como paga", variant: "destructive" });
-     } finally {
-       setSubmitting(false);
-     }
-  }, [refetchData]);
 
-  const cancelTransaction = useCallback(async (transaction: Transaction) => {
-     try {
-       setSubmitting(true);
-       await transactionService.cancelTransaction(transaction.id);
-       toast({ title: "Sucesso", description: "Transação cancelada" });
-       refetchData();
-     } catch (error) {
-       toast({ title: "Erro", description: "Erro ao cancelar", variant: "destructive" });
-     } finally {
-       setSubmitting(false);
-     }
-  }, [refetchData]);
+  const markAsPaid = useCallback(
+    async (transaction: Transaction) => {
+      try {
+        setSubmitting(true);
+        await transactionService.markAsPaid(transaction.id);
+        toast({ title: "Sucesso", description: "Transação marcada como paga" });
+        await applyDateFilter();
+      } catch (error) {
+        toast({
+          title: "Erro",
+          description: "Erro ao marcar como paga",
+          variant: "destructive",
+        });
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [applyDateFilter]
+  );
+
+  const cancelTransaction = useCallback(
+    async (transaction: Transaction) => {
+      try {
+        setSubmitting(true);
+        await transactionService.cancelTransaction(transaction.id);
+        toast({ title: "Sucesso", description: "Transação cancelada" });
+        await applyDateFilter();
+      } catch (error) {
+        toast({
+          title: "Erro",
+          description: "Erro ao cancelar",
+          variant: "destructive",
+        });
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [applyDateFilter]
+  );
 
   const handleDateChange = (newDateRange: DateRange | undefined) => {
     setDateRange(newDateRange);
@@ -205,5 +234,6 @@ export const useTransactions = () => {
     dateRange,
     handleDateChange,
     applyDateFilter,
+    tableKey,
   };
 };

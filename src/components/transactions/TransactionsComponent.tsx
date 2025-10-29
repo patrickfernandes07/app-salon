@@ -19,6 +19,8 @@ import { FinancialSummaryCards } from "./FinancialSummaryCards"
 import { createColumns } from "./columns"
 import { Transaction, CreateTransactionData, UpdateTransactionData } from "@/types/transaction"
 import { useTransactions } from "@/hooks/useTransactions"
+import { DateRangePicker } from "@/components/ui/DateRangePicker"
+import { DateRange } from "react-day-picker"
 
 export function TransactionsComponent() {
   const {
@@ -31,6 +33,9 @@ export function TransactionsComponent() {
     deleteTransaction,
     markAsPaid,
     cancelTransaction,
+    dateRange,
+    handleDateChange,
+    applyDateFilter,
   } = useTransactions()
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
@@ -52,7 +57,7 @@ export function TransactionsComponent() {
 
   const handleUpdate = async (data: UpdateTransactionData) => {
     if (!editingTransaction) return
-    
+
     try {
       await updateTransaction(editingTransaction.id, data)
       setEditingTransaction(null)
@@ -67,7 +72,7 @@ export function TransactionsComponent() {
 
   const handleConfirmDelete = async () => {
     if (!transactionToDelete) return
-    
+
     try {
       await deleteTransaction(transactionToDelete.id)
       setTransactionToDelete(null)
@@ -107,19 +112,28 @@ export function TransactionsComponent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Transações</h1>
           <p className="text-muted-foreground">
             Gerencie suas transações financeiras
           </p>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Transação
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nova Transação
+          </Button>
+        </div>
       </div>
 
+      <div className="flex items-center gap-2">
+        <DateRangePicker date={dateRange} onDateChange={handleDateChange} />
+        <Button onClick={applyDateFilter}>
+          Filtrar
+        </Button>
+      </div>
+      
       {/* Resumo Financeiro */}
       <FinancialSummaryCards summary={financialSummary} loading={loading} />
 

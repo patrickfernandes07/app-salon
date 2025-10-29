@@ -14,12 +14,21 @@ import {
 class TransactionService {
   private readonly baseUrl = "/transactions";
 
-  async getTransactions(companyId?: number) {
+async getTransactions(
+    companyId?: number,
+    startDate?: string,
+    endDate?: string
+  ) {
     const params = new URLSearchParams();
     if (companyId) {
       params.append("companyId", companyId.toString());
     }
-
+    if (startDate) {
+      params.append("startDate", startDate);
+    }
+    if (endDate) {
+      params.append("endDate", endDate);
+    }
     const finalUrl = params.toString()
       ? `${this.baseUrl}?${params.toString()}`
       : this.baseUrl;
@@ -140,6 +149,7 @@ class TransactionService {
       params.append("endDate", endDate);
     }
 
+    // Ajuste a rota se necessário, o backend usa /reports/summary?
     const finalUrl = params.toString()
       ? `${this.baseUrl}/reports/summary?${params.toString()}`
       : `${this.baseUrl}/reports/summary`;

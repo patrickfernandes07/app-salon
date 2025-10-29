@@ -50,8 +50,7 @@ const transactionSchema = z.object({
   installments: z.number().min(1, "Número de parcelas deve ser pelo menos 1").optional(),
   dueDate: z.string().optional(),
   professionalId: z.number().optional(),
-  appointmentId: z.number().optional(),
-  companyId: z.number().optional(),
+  appointmentId: z.number().optional()
 })
 
 type TransactionFormValues = z.infer<typeof transactionSchema>
@@ -75,8 +74,7 @@ export function TransactionForm({ transaction, onSubmit, onCancel, isSubmitting 
       installments: transaction?.installments || 1,
       dueDate: transaction?.dueDate ? new Date(transaction.dueDate).toISOString().split('T')[0] : "",
       professionalId: transaction?.professionalId || undefined,
-      appointmentId: transaction?.appointmentId || undefined,
-      companyId: transaction?.companyId || 1, // provisório
+      appointmentId: transaction?.appointmentId || undefined
     },
   })
 
@@ -86,8 +84,7 @@ export function TransactionForm({ transaction, onSubmit, onCancel, isSubmitting 
       dueDate: values.dueDate || undefined,
       professionalId: values.professionalId || undefined,
       appointmentId: values.appointmentId || undefined,
-      installments: values.installments || 1,
-      companyId: transaction?.companyId || 1, // provisório
+      installments: values.installments || 1
     }
     
     await onSubmit(formattedValues)
